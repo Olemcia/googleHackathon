@@ -25,6 +25,7 @@ import {
   type CheckItemCompatibilityOutput,
 } from '@/ai/flows/check-item-compatibility';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface UserProfile {
   allergies: string[];
@@ -43,6 +44,7 @@ export default function Home() {
   const [result, setResult] = useState<CheckItemCompatibilityOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const [analyzedItemName, setAnalyzedItemName] = useState('');
 
   const handleProfileChange = (field: keyof UserProfile) => (items: string[]) => {
     setProfile((prev) => ({ ...prev, [field]: items }));
@@ -66,7 +68,8 @@ export default function Home() {
   };
 
   const handleCheckCompatibility = async () => {
-    if (!itemName.trim() && !imagePreview) {
+    const currentItemName = itemName.trim();
+    if (!currentItemName && !imagePreview) {
       toast({
         title: 'Item details required',
         description: 'Please enter an item name or upload a photo to check.',
@@ -79,13 +82,14 @@ export default function Home() {
 
     const input: CheckItemCompatibilityInput = {
       userProfile: profile,
-      itemName: itemName.trim(),
+      itemName: currentItemName,
       photoDataUri: imagePreview || undefined,
     };
 
     try {
       const response = await checkItemCompatibility(input);
       setResult(response);
+      setAnalyzedItemName(currentItemName);
     } catch (error) {
       console.error('Compatibility check failed:', error);
       toast({
@@ -100,6 +104,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
+      <header className="absolute top-4 right-4 z-50">
+        <ThemeToggle />
+      </header>
       <main className="p-4 py-8 md:p-8 md:py-12 lg:p-12 lg:py-16">
         <div className="max-w-7xl mx-auto">
           <section className="text-center mb-12 md:mb-16">
@@ -112,6 +119,13 @@ export default function Home() {
             <p className="max-w-2xl mx-auto mt-4 text-lg text-muted-foreground">
               Instantly check if a new food or drug is compatible with your personal health profile.
             </p>
+            <Alert variant="default" className="max-w-2xl mx-auto mt-6 text-left border-accent/50 bg-accent/10">
+              <Info className="h-4 w-4 text-accent" />
+              <AlertTitle className="font-semibold text-accent-foreground">Important Disclaimer</AlertTitle>
+              <AlertDescription className="text-muted-foreground">
+                This app is not a substitute for medical advice. Always consult with a qualified healthcare professional before making any decisions about your health, medication, or diet.
+              </AlertDescription>
+            </Alert>
           </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
@@ -152,7 +166,7 @@ export default function Home() {
             </section>
 
             <aside id="checker" aria-labelledby="checker-heading" className="lg:sticky top-8 self-start">
-               <Card className="shadow-xl shadow-primary/5 border-primary/20">
+               <Card className="shadow-xl shadow-primary/5 border-primary/20 dark:shadow-primary/10">
                 <CardHeader>
                   <CardTitle id="checker-heading" className="text-3xl font-bold tracking-tight">Compatibility Checker</CardTitle>
                   <CardDescription>Enter an item's details to check against your profile.</CardDescription>
@@ -225,7 +239,7 @@ export default function Home() {
                       <Card className="border-primary/30 bg-primary/5 animate-in fade-in-50 duration-500">
                         <CardHeader>
                           <CardTitle className="flex items-center gap-2 text-primary">
-                            <HeartPulse/> Analysis for "{itemName}"
+                            <HeartPulse/> Analysis for "{analyzedItemName || 'Uploaded Item'}"
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
