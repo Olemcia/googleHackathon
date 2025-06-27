@@ -6,3 +6,4 @@ import '@/ai/flows/suggest-alternatives.ts';
 import '@/ai/flows/get-post-ingestion-advice.ts';
 import '@/ai/flows/get-suggestions.ts';
 import '@/ai/flows/validate-profile-item.ts';
+import '@/ai/flows/get-lifestyle-tips.ts';

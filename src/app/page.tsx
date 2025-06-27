@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
   Ban,
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   ShieldX,
+  Leaf,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,10 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
+import {
+  getLifestyleTips,
+  type GetLifestyleTipsOutput,
+} from '@/ai/flows/get-lifestyle-tips';
 
 interface UserProfile {
   allergies: string[];
@@ -61,9 +66,11 @@ export default function Home() {
   const [result, setResult] = useState<CheckItemCompatibilityOutput | null>(null);
   const [alternatives, setAlternatives] = useState<SuggestAlternativesOutput | null>(null);
   const [advice, setAdvice] = useState<GetPostIngestionAdviceOutput | null>(null);
+  const [tips, setTips] = useState<GetLifestyleTipsOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [isAdvising, setIsAdvising] = useState(false);
+  const [isGettingTips, setIsGettingTips] = useState(false);
   const { toast } = useToast();
   const [analyzedItemName, setAnalyzedItemName] = useState('');
 
@@ -143,6 +150,7 @@ export default function Home() {
     setResult(null);
     setAlternatives(null);
     setAdvice(null);
+    setTips(null);
     setAnalyzedItemName(currentItemName);
 
     const input: CheckItemCompatibilityInput = {
@@ -225,7 +233,37 @@ export default function Home() {
     }
   };
 
+  const handleGetLifestyleTips = async () => {
+    if (profile.allergies.length === 0 && profile.conditions.length === 0) {
+      toast({
+        title: 'Profile is empty',
+        description: 'Please add at least one allergy or condition to get tips.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsGettingTips(true);
+    setTips(null);
+
+    try {
+      const response = await getLifestyleTips({ userProfile: profile });
+      setTips(response);
+    } catch (error) {
+      console.error('Get lifestyle tips failed:', error);
+      toast({
+        title: 'Tips Failed',
+        description: 'Could not get lifestyle tips. Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGettingTips(false);
+    }
+  };
+
+
   const showActionButtons = result && result.riskLevel && ['Low', 'Moderate', 'High'].includes(result.riskLevel);
+  const isWorking = isLoading || isSuggesting || isAdvising || isGettingTips;
+  const hasContent = result || alternatives || advice || tips;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
@@ -290,6 +328,17 @@ export default function Home() {
                   placeholder="e.g., Type 2 Diabetes"
                   category="conditions"
                 />
+              </div>
+              <div className="mt-6">
+                <Button
+                    onClick={handleGetLifestyleTips}
+                    disabled={isGettingTips || (profile.allergies.length === 0 && profile.conditions.length === 0)}
+                    className="w-full text-base py-6 font-bold"
+                    variant="outline"
+                >
+                    {isGettingTips ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lightbulb className="mr-2 h-5 w-5" />}
+                    {isGettingTips ? 'Getting Tips...' : 'Get Lifestyle Tips'}
+                </Button>
               </div>
             </section>
 
@@ -438,10 +487,56 @@ export default function Home() {
                        </Card>
                     )}
 
-                    {!isLoading && !result && (
+                    {isGettingTips && (
+                      <Card>
+                          <CardHeader>
+                              <Skeleton className="h-6 w-1/2" />
+                          </CardHeader>
+                          <CardContent className="pt-6 space-y-4">
+                              <div className="space-y-2">
+                                  <Skeleton className="h-4 w-1/4" />
+                                  <Skeleton className="h-4 w-full" />
+                                  <Skeleton className="h-4 w-5/6" />
+                              </div>
+                              <div className="space-y-2">
+                                  <Skeleton className="h-4 w-1/4" />
+                                  <Skeleton className="h-4 w-full" />
+                              </div>
+                          </CardContent>
+                      </Card>
+                    )}
+                    {tips && (
+                      <Card className="animate-in fade-in-50 duration-500">
+                          <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-accent">
+                              <Leaf /> Lifestyle Tips
+                          </CardTitle>
+                          <CardDescription>
+                              General recommendations based on your profile.
+                          </CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                          {tips.tips.map((tip, index) => (
+                              <div key={index} className="p-3 rounded-md border bg-background/50">
+                                  <p className="font-semibold">{tip.category}</p>
+                                  <p className="text-sm text-muted-foreground">{tip.tip}</p>
+                              </div>
+                          ))}
+                          <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
+                              <Info className="h-4 w-4 text-accent" />
+                              <AlertTitle className="text-accent">General Disclaimer</AlertTitle>
+                              <AlertDescription className="text-muted-foreground">
+                              {tips.disclaimer}
+                              </AlertDescription>
+                          </Alert>
+                          </CardContent>
+                      </Card>
+                    )}
+
+                    {!isWorking && !hasContent && (
                        <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
                          <p className="text-muted-foreground">
-                          Your compatibility report will appear here.
+                          Your compatibility report or lifestyle tips will appear here.
                          </p>
                        </div>
                     )}
