@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Ban,
@@ -106,7 +106,7 @@ export default function Home() {
     setProfile(newProfile);
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) {
       return;
@@ -118,28 +118,25 @@ export default function Home() {
         description: 'You can upload a maximum of 5 photos.',
         variant: 'destructive',
       });
-      // Reset input to allow selecting files again
-      e.target.value = '';
       return;
     }
 
-    const filesArray = Array.from(files);
     const newPreviews: string[] = [];
-
+    const filesArray = Array.from(files);
+    
+    let filesLoaded = 0;
     filesArray.forEach((file) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         newPreviews.push(reader.result as string);
-        if (newPreviews.length === filesArray.length) {
+        filesLoaded++;
+        if (filesLoaded === filesArray.length) {
           setImagePreviews((prev) => [...prev, ...newPreviews]);
         }
       };
       reader.readAsDataURL(file);
     });
-
-    // Reset input to allow selecting the same file again if removed
-    e.target.value = '';
-  };
+  }, [imagePreviews.length, toast]);
 
   const removeImage = (index: number) => {
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
@@ -291,8 +288,8 @@ export default function Home() {
               Instantly check if a new food or drug is compatible with your personal health profile.
             </p>
             <Alert variant="default" className="max-w-2xl mx-auto mt-6 text-left border-accent/50 bg-accent/10">
-              <Info className="h-4 w-4 text-accent" />
-              <AlertTitle className="font-semibold text-accent">Important Disclaimer</AlertTitle>
+              <Info className="h-4 w-4 text-accent/80" />
+              <AlertTitle className="font-semibold text-accent/90">Important Disclaimer</AlertTitle>
               <AlertDescription className="text-muted-foreground">
                 This app is not a substitute for medical advice. Always consult with a qualified healthcare professional before making any decisions about your health, medication, or diet.
               </AlertDescription>
@@ -536,7 +533,7 @@ export default function Home() {
                               <AlertTitle>Urgent Disclaimer</AlertTitle>
                               <AlertDescription>
                                 {advice.disclaimer}
-                              </Aler-Description>
+                              </AlertDescription>
                             </Alert>
                          </CardContent>
                        </Card>
