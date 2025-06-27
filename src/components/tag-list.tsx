@@ -13,6 +13,10 @@ import {
   type GetSuggestionsInput,
 } from '@/ai/flows/get-suggestions';
 import { useToast } from '@/hooks/use-toast';
+import {
+  validateProfileItem,
+  type ValidateProfileItemInput,
+} from '@/ai/flows/validate-profile-item';
 
 interface TagListProps {
   title: string;
@@ -28,18 +32,55 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleAddItem = (item: string) => {
+  const handleAddItem = async (item: string) => {
     const trimmedValue = item.trim();
-    if (trimmedValue && !items.find(i => i.toLowerCase() === trimmedValue.toLowerCase())) {
-      setItems([...items, trimmedValue]);
-    }
-    setInputValue('');
-    setSuggestions([]);
     setPopoverOpen(false);
+    setSuggestions([]);
+
+    if (!trimmedValue) {
+      return;
+    }
+    if (items.find(i => i.toLowerCase() === trimmedValue.toLowerCase())) {
+      toast({
+        title: 'Item already exists',
+        description: `"${trimmedValue}" is already in your list.`,
+      });
+      setInputValue('');
+      return;
+    }
+
+    setIsAdding(true);
+    
+    try {
+      const validationInput: ValidateProfileItemInput = { category, itemName: trimmedValue };
+      const { isValid } = await validateProfileItem(validationInput);
+
+      if (isValid) {
+        setItems([...items, trimmedValue]);
+        setInputValue('');
+      } else {
+        toast({
+          title: 'Invalid Item',
+          description: `"${trimmedValue}" does not seem to be a valid entry for ${category}. Please check the spelling.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Validation failed:', error);
+      toast({
+        title: 'Validation Failed',
+        description: 'Could not validate the item. Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAdding(false);
+    }
   };
+
 
   const handleRemoveItem = (itemToRemove: string) => {
     setItems(items.filter((item) => item !== itemToRemove));
@@ -72,8 +113,12 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
     try {
       const input: GetSuggestionsInput = { category, query };
       const response = await getSuggestions(input);
-      if (response.suggestions.length > 0) {
-        setSuggestions(response.suggestions);
+      const filteredSuggestions = response.suggestions.filter(
+        (s) => !items.find(i => i.toLowerCase() === s.toLowerCase())
+      );
+
+      if (filteredSuggestions.length > 0) {
+        setSuggestions(filteredSuggestions);
         setPopoverOpen(true);
       } else {
         setPopoverOpen(false);
@@ -90,7 +135,7 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
     }
   };
   
-  const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 300), [category]);
+  const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 300), [category, items]);
 
   useEffect(() => {
     debouncedFetchSuggestions(inputValue);
@@ -106,7 +151,7 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Popover open={popoverOpen && suggestions.length > 0} onOpenChange={setPopoverOpen}>
           <PopoverAnchor asChild>
             <div className="flex gap-2 mb-4 relative">
               <Input
@@ -120,8 +165,8 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
                 className="text-base"
                 autoComplete="off"
               />
-              <Button type="button" onClick={() => handleAddItem(inputValue)} size="icon" aria-label={`Add ${inputValue}`}>
-                <Plus className="h-5 w-5" />
+              <Button type="button" onClick={() => handleAddItem(inputValue)} size="icon" aria-label={`Add ${inputValue}`} disabled={isAdding}>
+                {isAdding ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </Button>
             </div>
           </PopoverAnchor>
