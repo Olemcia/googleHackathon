@@ -108,28 +108,37 @@ export default function Home() {
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      if (imagePreviews.length + files.length > 5) {
-        toast({ title: "Upload limit reached", description: "You can upload a maximum of 5 photos.", variant: "destructive" });
-        return;
-      }
-      const fileReaders: FileReader[] = [];
-      const newPreviews: string[] = [];
-      
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        fileReaders.push(reader);
-        reader.onloadend = () => {
-          newPreviews.push(reader.result as string);
-          if (newPreviews.length === files.length) {
-            setImagePreviews(prev => [...prev, ...newPreviews]);
-          }
-        };
-        reader.readAsDataURL(file);
-      });
+    if (!files || files.length === 0) {
+      return;
     }
-     const fileInput = document.getElementById('item-photo') as HTMLInputElement;
-     if(fileInput) fileInput.value = '';
+
+    if (imagePreviews.length + files.length > 5) {
+      toast({
+        title: 'Upload limit reached',
+        description: 'You can upload a maximum of 5 photos.',
+        variant: 'destructive',
+      });
+      // Reset input to allow selecting files again
+      e.target.value = '';
+      return;
+    }
+
+    const filesArray = Array.from(files);
+    const newPreviews: string[] = [];
+
+    filesArray.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        newPreviews.push(reader.result as string);
+        if (newPreviews.length === filesArray.length) {
+          setImagePreviews((prev) => [...prev, ...newPreviews]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input to allow selecting the same file again if removed
+    e.target.value = '';
   };
 
   const removeImage = (index: number) => {
@@ -527,7 +536,7 @@ export default function Home() {
                               <AlertTitle>Urgent Disclaimer</AlertTitle>
                               <AlertDescription>
                                 {advice.disclaimer}
-                              </AlertDescription>
+                              </Aler-Description>
                             </Alert>
                          </CardContent>
                        </Card>
