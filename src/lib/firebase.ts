@@ -11,25 +11,19 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Check if all necessary keys are present
+export const isFirebaseConfigured = firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId;
+
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 
-// This flag will be true only if the essential Firebase env vars are provided.
-export const isFirebaseEnabled = !!(
-  firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.projectId
-);
-
-if (isFirebaseEnabled) {
-  try {
+if (isFirebaseConfigured) {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
-  } catch (e) {
-    console.error("Firebase initialization error. Make sure you have configured your .env file correctly.", e);
-  }
+} else {
+    console.warn("Firebase configuration is missing. Features like authentication and profile saving will be disabled.");
 }
 
 export { app, auth, db };

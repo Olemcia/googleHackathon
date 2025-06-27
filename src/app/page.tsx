@@ -19,7 +19,6 @@ import {
   ShieldX,
   LogOut,
   User as UserIcon,
-  AlertTriangle,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
@@ -47,7 +46,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
-import { auth, db, isFirebaseEnabled } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { AuthDialog } from '@/components/auth-dialog';
@@ -79,8 +78,7 @@ export default function Home() {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      // Only fetch profile if firebase is enabled and a user is logged in
-      if (isFirebaseEnabled && user && db) {
+      if (user && db) {
         setProfileLoading(true);
         try {
           const docRef = doc(db, 'users', user.uid);
@@ -104,7 +102,7 @@ export default function Home() {
           setProfileLoading(false);
         }
       } else {
-        // If no user or firebase is disabled, use a default empty profile
+        // If no user, use a default empty profile
         setProfile({ allergies: [], medications: [], conditions: [] });
         setProfileLoading(false);
       }
@@ -140,20 +138,21 @@ export default function Home() {
   };
 
   const handleProfileChange = (field: keyof UserProfile) => async (items: string[]) => {
-    // Can only save profile if firebase is enabled and user is logged in.
-    if (!isFirebaseEnabled || !user || !db) return;
-    
     const newProfile = { ...profile, [field]: items };
     setProfile(newProfile);
-    try {
-      const docRef = doc(db, 'users', user.uid);
-      await setDoc(docRef, newProfile, { merge: true });
-    } catch (error) {
-       toast({
-         title: "Update Failed",
-         description: `Could not save your ${field}.`,
-         variant: "destructive",
-       });
+
+    // Only persist if user is logged in and firebase is configured
+    if (user && db) {
+      try {
+        const docRef = doc(db, 'users', user.uid);
+        await setDoc(docRef, newProfile, { merge: true });
+      } catch (error) {
+        toast({
+          title: "Update Failed",
+          description: `Could not save your ${field}.`,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -188,14 +187,6 @@ export default function Home() {
   };
 
   const handleCheckCompatibility = async () => {
-    if (!isFirebaseEnabled && !user) {
-       toast({ title: "Please configure Firebase", description: "Login is disabled until Firebase is configured in your environment.", variant: "destructive" });
-       return;
-    }
-     if (!user) {
-       toast({ title: "Please log in", description: "You need to be logged in to check compatibility.", variant: "destructive" });
-       return;
-    }
     const currentItemName = itemName.trim();
     if (!currentItemName && imagePreviews.length === 0) {
       toast({
@@ -340,17 +331,8 @@ export default function Home() {
               <div>
                 <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
                 <p className="text-muted-foreground mt-2">
-                  {user ? 'Add your health details for an accurate analysis. Your data is saved to your account.' : 'Log in to manage your health profile.'}
+                  {user ? 'Your health details are saved to your account.' : 'Log in to save your profile. Currently, data is stored locally.'}
                 </p>
-                {!isFirebaseEnabled && (
-                  <Alert variant="destructive" className="mt-4">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Firebase Not Configured</AlertTitle>
-                    <AlertDescription>
-                      User login and profile storage are disabled. To enable them, add your Firebase project credentials to your environment variables.
-                    </AlertDescription>
-                  </Alert>
-                )}
               </div>
               {profileLoading ? (
                  <div className="space-y-4">
@@ -368,7 +350,7 @@ export default function Home() {
                     setItems={handleProfileChange('allergies')}
                     placeholder="e.g., Penicillin"
                     category="allergies"
-                    disabled={isAppDisabled || !user}
+                    disabled={isAppDisabled}
                   />
                   <TagList
                     id="medications-input"
@@ -378,7 +360,7 @@ export default function Home() {
                     setItems={handleProfileChange('medications')}
                     placeholder="e.g., Metformin 500mg"
                     category="medications"
-                    disabled={isAppDisabled || !user}
+                    disabled={isAppDisabled}
                   />
                   <TagList
                     id="conditions-input"
@@ -388,7 +370,7 @@ export default function Home() {
                     setItems={handleProfileChange('conditions')}
                     placeholder="e.g., Type 2 Diabetes"
                     category="conditions"
-                    disabled={isAppDisabled || !user}
+                    disabled={isAppDisabled}
                   />
                 </div>
               )}
@@ -409,7 +391,7 @@ export default function Home() {
                           <Upload className="h-8 w-8 text-muted-foreground" />
                           <span className="text-xs text-muted-foreground mt-1 text-center">Upload Photo(s)</span>
                         </label>
-                        <Input id="item-photo" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" disabled={!user} />
+                        <Input id="item-photo" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
                          <div className="flex flex-wrap gap-2 flex-1">
                           {imagePreviews.map((preview, index) => (
                              <div key={index} className="relative flex-shrink-0">
@@ -433,11 +415,10 @@ export default function Home() {
                         placeholder="e.g., Tylenol 500mg, Coffee"
                         className="flex-grow text-base"
                         aria-label="Item to check"
-                        disabled={!user}
                       />
                     </div>
                     
-                    <Button onClick={handleCheckCompatibility} disabled={isLoading || !user} className="w-full text-base py-6 font-bold">
+                    <Button onClick={handleCheckCompatibility} disabled={isLoading} className="w-full text-base py-6 font-bold">
                       {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <HeartPulse className="mr-2 h-5 w-5" /> }
                       {isLoading ? 'Checking...' : 'Check Compatibility'}
                     </Button>
@@ -543,7 +524,7 @@ export default function Home() {
                     {!isLoading && !result && (
                        <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
                          <p className="text-muted-foreground">
-                          {user ? 'Your compatibility report will appear here.' : 'Please log in to start a compatibility check.'}
+                          {user ? 'Your compatibility report will appear here.' : 'Add items to your profile and check compatibility.'}
                          </p>
                        </div>
                     )}
