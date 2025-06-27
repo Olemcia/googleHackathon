@@ -1,19 +1,22 @@
 "use client";
 
 import { useState } from 'react';
+import Image from 'next/image';
 import {
   Ban,
   Pill,
   Stethoscope,
-  TestTube2,
   Loader2,
   Info,
   HeartPulse,
+  Upload,
+  X,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -36,6 +39,7 @@ export default function Home() {
     conditions: ['High Blood Pressure'],
   });
   const [itemName, setItemName] = useState('Ibuprofen 200mg');
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<CheckItemCompatibilityOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -44,11 +48,28 @@ export default function Home() {
     setProfile((prev) => ({ ...prev, [field]: items }));
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImagePreview(null);
+    const fileInput = document.getElementById('item-photo') as HTMLInputElement;
+    if(fileInput) fileInput.value = '';
+  };
+
   const handleCheckCompatibility = async () => {
-    if (!itemName.trim()) {
+    if (!itemName.trim() && !imagePreview) {
       toast({
-        title: 'Item name is required',
-        description: 'Please enter a drug or food item to check.',
+        title: 'Item details required',
+        description: 'Please enter an item name or upload a photo to check.',
         variant: 'destructive',
       });
       return;
@@ -59,6 +80,7 @@ export default function Home() {
     const input: CheckItemCompatibilityInput = {
       userProfile: profile,
       itemName: itemName.trim(),
+      photoDataUri: imagePreview || undefined,
     };
 
     try {
@@ -77,30 +99,31 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="py-6 px-4 md:px-8 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex items-center gap-3">
-          <TestTube2 className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold tracking-tight">
-            Health Harmony <span className="text-primary">AI</span>
-          </h1>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
+      <main className="p-4 py-8 md:p-8 md:py-12 lg:p-12 lg:py-16">
+        <div className="max-w-7xl mx-auto">
+          <section className="text-center mb-12 md:mb-16">
+            <div className="inline-block p-4 bg-primary/10 rounded-full mb-4">
+              <HeartPulse className="h-10 w-10 text-primary" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
+              Health Harmony AI
+            </h1>
+            <p className="max-w-2xl mx-auto mt-4 text-lg text-muted-foreground">
+              Instantly check if a new food or drug is compatible with your personal health profile.
+            </p>
+          </section>
 
-      <main className="p-4 md:p-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-8">
-          
-          <section id="profile" aria-labelledby="profile-heading" className="lg:col-span-3">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+            
+            <section id="profile" aria-labelledby="profile-heading" className="space-y-6">
               <div>
-                <h2 id="profile-heading" className="text-2xl font-semibold">Your Health Profile</h2>
-                <p className="text-muted-foreground mt-1">
-                  Add your current health details for an accurate compatibility analysis. 
-                  This information is processed in your browser and is not stored.
+                <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
+                <p className="text-muted-foreground mt-2">
+                  Add your current health details for an accurate compatibility analysis. This information is processed in your browser and is not stored.
                 </p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+              <div className="space-y-4">
                 <TagList
                   id="allergies-input"
                   title="Allergies"
@@ -126,31 +149,56 @@ export default function Home() {
                   placeholder="e.g., Type 2 Diabetes"
                 />
               </div>
-            </div>
-          </section>
+            </section>
 
-          <aside id="checker" aria-labelledby="checker-heading" className="lg:col-span-2 lg:sticky top-28 self-start">
-             <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle id="checker-heading" className="text-2xl font-semibold">Compatibility Checker</CardTitle>
-                <CardDescription>Enter a drug or food item to check against your profile.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      id="item-name-input"
-                      type="text"
-                      value={itemName}
-                      onChange={(e) => setItemName(e.target.value)}
-                      placeholder="e.g., Tylenol 500mg, Coffee"
-                      className="flex-grow"
-                      aria-label="Item to check"
-                    />
-                    <Button onClick={handleCheckCompatibility} disabled={isLoading} className="w-full sm:w-auto">
+            <aside id="checker" aria-labelledby="checker-heading" className="lg:sticky top-8 self-start">
+               <Card className="shadow-xl shadow-primary/5 border-primary/20">
+                <CardHeader>
+                  <CardTitle id="checker-heading" className="text-3xl font-bold tracking-tight">Compatibility Checker</CardTitle>
+                  <CardDescription>Enter an item's details to check against your profile.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                     <div className="space-y-2">
+                      <Label htmlFor="item-photo" className="font-semibold">Item Photo (Optional)</Label>
+                      <div className="flex items-start gap-4">
+                        {imagePreview ? (
+                          <div className="relative flex-shrink-0">
+                            <Image src={imagePreview} alt="Item preview" width={112} height={112} className="h-28 w-28 object-cover rounded-lg border-2 border-border" data-ai-hint="medication product" />
+                            <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-7 w-7 rounded-full shadow-md" onClick={removeImage}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <label htmlFor="item-photo" className="flex-shrink-0 flex flex-col items-center justify-center h-28 w-28 rounded-lg border-2 border-dashed border-muted-foreground/50 cursor-pointer hover:bg-accent/10 transition-colors">
+                            <Upload className="h-8 w-8 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground mt-1">Upload Photo</span>
+                          </label>
+                        )}
+                        <Input id="item-photo" type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+                        <p className="text-sm text-muted-foreground pt-2">
+                          For best results, upload a clear photo of the item, such as the product packaging or the pill itself.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="item-name-input" className="font-semibold">Item Name</Label>
+                      <Input
+                        id="item-name-input"
+                        type="text"
+                        value={itemName}
+                        onChange={(e) => setItemName(e.target.value)}
+                        placeholder="e.g., Tylenol 500mg, Coffee"
+                        className="flex-grow text-base"
+                        aria-label="Item to check"
+                      />
+                    </div>
+                    
+                    <Button onClick={handleCheckCompatibility} disabled={isLoading} className="w-full text-base py-6 font-bold">
                       {isLoading ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                           Checking...
                         </>
                       ) : (
@@ -174,18 +222,18 @@ export default function Home() {
                     )}
 
                     {result && (
-                      <Card className="bg-secondary/20 animate-in fade-in-50 duration-500">
+                      <Card className="border-primary/30 bg-primary/5 animate-in fade-in-50 duration-500">
                         <CardHeader>
-                          <CardTitle className="flex items-center gap-2">
-                            <HeartPulse className="text-primary"/> Analysis for "{itemName}"
+                          <CardTitle className="flex items-center gap-2 text-primary">
+                            <HeartPulse/> Analysis for "{itemName}"
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed">{result.analysis}</p>
-                          <Alert className="mt-6 bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700">
-                            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                            <AlertTitle className="font-semibold text-amber-800 dark:text-amber-200">Medical Disclaimer</AlertTitle>
-                            <AlertDescription className="text-amber-700 dark:text-amber-300">
+                          <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{result.analysis}</p>
+                          <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
+                            <Info className="h-4 w-4 text-accent" />
+                            <AlertTitle className="text-accent-foreground">Medical Disclaimer</AlertTitle>
+                            <AlertDescription className="text-muted-foreground">
                               {result.disclaimer}
                             </AlertDescription>
                           </Alert>
@@ -199,10 +247,10 @@ export default function Home() {
                        </div>
                     )}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </aside>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
         </div>
       </main>
     </div>

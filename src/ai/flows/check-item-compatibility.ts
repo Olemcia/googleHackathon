@@ -12,18 +12,26 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const CheckItemCompatibilityInputSchema = z.object({
-  userProfile: z.object({
-    allergies: z.array(z.string()).describe('The user\s allergies.'),
-    medications: z.array(z.string()).describe('The user\s current medications.'),
-    conditions: z.array(z.string()).describe('The user\s pre-existing medical conditions.'),
-  }).describe('The user\s health profile.'),
+  userProfile: z
+    .object({
+      allergies: z.array(z.string()).describe("The user's allergies."),
+      medications: z.array(z.string()).describe("The user's current medications."),
+      conditions: z.array(z.string()).describe("The user's pre-existing medical conditions."),
+    })
+    .describe("The user's health profile."),
   itemName: z.string().describe('The name of the drug or food item to check for compatibility.'),
+  photoDataUri: z
+    .string()
+    .optional()
+    .describe(
+      "An optional photo of the item, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
 });
 
 export type CheckItemCompatibilityInput = z.infer<typeof CheckItemCompatibilityInputSchema>;
 
 const CheckItemCompatibilityOutputSchema = z.object({
-  analysis: z.string().describe('The AI-generated analysis of the item\s compatibility with the user\s health profile.'),
+  analysis: z.string().describe("The AI-generated analysis of the item's compatibility with the user's health profile."),
   disclaimer: z.string().describe('A mandatory medical disclaimer.'),
 });
 
@@ -45,10 +53,13 @@ const checkItemCompatibilityPrompt = ai.definePrompt({
 - Pre-existing Medical Conditions: {{{userProfile.conditions}}}
 
 **Item to Evaluate:**
-- {{{itemName}}}
+- Name: {{{itemName}}}
+{{#if photoDataUri}}
+- Photo: {{media url=photoDataUri}}
+{{/if}}
 
 **Task:**
-Acting as a cautious medical information AI, analyze potential interactions, contraindications, and risks for the user based on their specific health profile and the item they want to take. Provide a clear, easy-to-understand explanation. Start with a direct safety conclusion (e.g., \"Potential Risk Identified,\" \"Appears Safe,\" \"Use with Caution\") and then explain the reasoning in detail. Do not provide medical advice, but explain the known biological and chemical interactions.
+Acting as a cautious medical information AI, analyze potential interactions, contraindications, and risks for the user based on their specific health profile and the item they want to take. If a photo is provided, use it as the primary source for identifying the item. If the "Name" field seems to contradict the photo, prioritize the visual information from the photo. Provide a clear, easy-to-understand explanation. Start with a direct safety conclusion (e.g., "Potential Risk Identified," "Appears Safe," "Use with Caution") and then explain the reasoning in detail. Do not provide medical advice, but explain the known biological and chemical interactions.
   `,
   config: {
     safetySettings: [
