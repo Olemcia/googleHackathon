@@ -46,7 +46,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/use-auth';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, isFirebaseConfigured } from '@/lib/firebase';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { AuthDialog } from '@/components/auth-dialog';
@@ -318,7 +318,7 @@ export default function Home() {
             </p>
             <Alert variant="default" className="max-w-2xl mx-auto mt-6 text-left border-accent/50 bg-accent/10">
               <Info className="h-4 w-4 text-accent" />
-              <AlertTitle className="font-semibold text-accent-foreground">Important Disclaimer</AlertTitle>
+              <AlertTitle className="font-semibold text-accent">Important Disclaimer</AlertTitle>
               <AlertDescription className="text-muted-foreground">
                 This app is not a substitute for medical advice. Always consult with a qualified healthcare professional before making any decisions about your health, medication, or diet.
               </AlertDescription>
@@ -331,7 +331,11 @@ export default function Home() {
               <div>
                 <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
                 <p className="text-muted-foreground mt-2">
-                  {user ? 'Your health details are saved to your account.' : 'Log in to save your profile. Currently, data is stored locally.'}
+                  {isFirebaseConfigured
+                    ? user
+                      ? 'Your health details are saved to your account.'
+                      : 'Log in to save your profile. Currently, data is stored for this session only.'
+                    : 'Configure Firebase in your .env file to enable user accounts and data persistence.'}
                 </p>
               </div>
               {profileLoading ? (
@@ -467,7 +471,7 @@ export default function Home() {
                             )}
                             <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
                               <Info className="h-4 w-4 text-accent" />
-                              <AlertTitle className="text-accent-foreground">Medical Disclaimer</AlertTitle>
+                              <AlertTitle className="text-accent">Medical Disclaimer</AlertTitle>
                               <AlertDescription className="text-muted-foreground">
                                 {result.disclaimer}
                               </AlertDescription>
@@ -483,7 +487,7 @@ export default function Home() {
                     {alternatives && (
                        <Card className="animate-in fade-in-50 duration-500">
                          <CardHeader>
-                           <CardTitle className="flex items-center gap-2 text-accent-foreground">
+                           <CardTitle className="flex items-center gap-2 text-accent">
                              <Lightbulb/> Suggested Alternatives
                            </CardTitle>
                          </CardHeader>
@@ -524,7 +528,7 @@ export default function Home() {
                     {!isLoading && !result && (
                        <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
                          <p className="text-muted-foreground">
-                          {user ? 'Your compatibility report will appear here.' : 'Add items to your profile and check compatibility.'}
+                          {user ? 'Your compatibility report will appear here.' : 'Log in or fill out your profile to get started.'}
                          </p>
                        </div>
                     )}
@@ -538,5 +542,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
