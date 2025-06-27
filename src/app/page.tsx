@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
   Ban,
@@ -73,6 +73,7 @@ export default function Home() {
   const [isGettingTips, setIsGettingTips] = useState(false);
   const { toast } = useToast();
   const [analyzedItemName, setAnalyzedItemName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const riskDisplayConfig = {
     None: {
@@ -106,11 +107,9 @@ export default function Home() {
     setProfile(newProfile);
   };
 
-  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) {
-      return;
-    }
+    if (!files) return;
 
     if (imagePreviews.length + files.length > 5) {
       toast({
@@ -121,22 +120,22 @@ export default function Home() {
       return;
     }
 
-    const newPreviews: string[] = [];
-    const filesArray = Array.from(files);
-    
-    let filesLoaded = 0;
-    filesArray.forEach((file) => {
+    const newImageUrls: string[] = [];
+    const fileList = Array.from(files);
+
+    fileList.forEach(file => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        newPreviews.push(reader.result as string);
-        filesLoaded++;
-        if (filesLoaded === filesArray.length) {
-          setImagePreviews((prev) => [...prev, ...newPreviews]);
+      reader.onload = (loadEvent) => {
+        if (loadEvent.target?.result) {
+          newImageUrls.push(loadEvent.target.result as string);
+          if (newImageUrls.length === fileList.length) {
+            setImagePreviews(prev => [...prev, ...newImageUrls]);
+          }
         }
       };
       reader.readAsDataURL(file);
     });
-  }, [imagePreviews.length, toast]);
+  };
 
   const removeImage = (index: number) => {
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
@@ -271,288 +270,296 @@ export default function Home() {
   const hasCompatibilityContent = result || alternatives || advice;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
-       <header className="absolute top-4 right-4 z-50 flex items-center gap-4">
-        <ThemeToggle />
-      </header>
-      <main className="p-4 py-8 md:p-8 md:py-12 lg:p-12 lg:py-16">
-        <div className="max-w-7xl mx-auto">
-          <section className="text-center mb-12 md:mb-16">
-            <div className="inline-block p-4 bg-primary/10 rounded-full mb-4">
-              <HeartPulse className="h-10 w-10 text-primary" />
-            </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
-              MediMatch AI
-            </h1>
-            <p className="max-w-2xl mx-auto mt-4 text-lg text-muted-foreground">
-              Instantly check if a new food or drug is compatible with your personal health profile.
-            </p>
-            <Alert variant="default" className="max-w-2xl mx-auto mt-6 text-left border-accent/50 bg-accent/10">
-              <Info className="h-4 w-4 text-accent/80" />
-              <AlertTitle className="font-semibold text-accent/90">Important Disclaimer</AlertTitle>
-              <AlertDescription className="text-muted-foreground">
-                This app is not a substitute for medical advice. Always consult with a qualified healthcare professional before making any decisions about your health, medication, or diet.
-              </AlertDescription>
-            </Alert>
-          </section>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-            
-            <section id="profile" aria-labelledby="profile-heading" className="space-y-6">
-              <div>
-                <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
-                <p className="text-muted-foreground mt-2">
-                  Your health details are stored for this session only.
-                </p>
+    <div className="relative min-h-screen bg-background text-foreground overflow-hidden">
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-primary/20 rounded-full mix-blend-multiply filter blur-2xl opacity-50 animate-blob"></div>
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-accent/20 rounded-full mix-blend-multiply filter blur-2xl opacity-50 animate-blob" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-primary/10 rounded-full mix-blend-multiply filter blur-2xl opacity-50 animate-blob" style={{ animationDelay: '4s' }}></div>
+      <div className="relative z-10">
+        <header className="absolute top-4 right-4 z-50 flex items-center gap-4">
+          <ThemeToggle />
+        </header>
+        <main className="p-4 py-8 md:p-8 md:py-12 lg:p-12 lg:py-16">
+          <div className="max-w-7xl mx-auto">
+            <section className="text-center mb-12 md:mb-16">
+              <div className="inline-block p-4 bg-primary/10 rounded-full mb-4">
+                <HeartPulse className="h-10 w-10 text-primary" />
               </div>
-              <div className="space-y-4">
-                <TagList
-                  id="allergies-input"
-                  title="Allergies"
-                  Icon={Ban}
-                  items={profile.allergies}
-                  setItems={handleProfileChange('allergies')}
-                  placeholder="e.g., Penicillin"
-                  category="allergies"
-                />
-                <TagList
-                  id="medications-input"
-                  title="Current Medications"
-                  Icon={Pill}
-                  items={profile.medications}
-                  setItems={handleProfileChange('medications')}
-                  placeholder="e.g., Metformin 500mg"
-                  category="medications"
-                />
-                <TagList
-                  id="conditions-input"
-                  title="Medical Conditions"
-                  Icon={Stethoscope}
-                  items={profile.conditions}
-                  setItems={handleProfileChange('conditions')}
-                  placeholder="e.g., Type 2 Diabetes"
-                  category="conditions"
-                />
-              </div>
-              <div className="mt-6">
-                <Button
-                    onClick={handleGetLifestyleTips}
-                    disabled={isGettingTips || isCompatibilityWorking || (profile.allergies.length === 0 && profile.conditions.length === 0)}
-                    className="w-full text-base py-6 font-bold"
-                    variant="outline"
-                >
-                    {isGettingTips ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lightbulb className="mr-2 h-5 w-5" />}
-                    {isGettingTips ? 'Getting Tips...' : 'Get Lifestyle Tips'}
-                </Button>
-              </div>
-              <div className="space-y-4">
-                {isGettingTips && (
-                  <Card>
-                      <CardHeader>
-                          <Skeleton className="h-6 w-1/2" />
-                      </CardHeader>
-                      <CardContent className="pt-6 space-y-4">
-                          <div className="space-y-2">
-                              <Skeleton className="h-4 w-1/4" />
-                              <Skeleton className="h-4 w-full" />
-                              <Skeleton className="h-4 w-5/6" />
-                          </div>
-                          <div className="space-y-2">
-                              <Skeleton className="h-4 w-1/4" />
-                              <Skeleton className="h-4 w-full" />
-                          </div>
-                      </CardContent>
-                  </Card>
-                )}
-                {tips && (
-                  <Card className="animate-in fade-in-50 duration-500">
-                      <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-accent">
-                          <Leaf /> Lifestyle Tips
-                      </CardTitle>
-                      <CardDescription>
-                          General recommendations based on your profile.
-                      </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                      {tips.tips.map((tip, index) => (
-                          <div key={index} className="p-3 rounded-md border bg-background/50">
-                              <p className="font-semibold">{tip.category}</p>
-                              <p className="text-sm text-muted-foreground">{tip.tip}</p>
-                          </div>
-                      ))}
-                      <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
-                          <Info className="h-4 w-4 text-accent" />
-                          <AlertTitle className="text-accent">General Disclaimer</AlertTitle>
-                          <AlertDescription className="text-muted-foreground">
-                          {tips.disclaimer}
-                          </AlertDescription>
-                      </Alert>
-                      </CardContent>
-                  </Card>
-                )}
-              </div>
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
+                Health Harmony AI
+              </h1>
+              <p className="max-w-2xl mx-auto mt-4 text-lg text-muted-foreground">
+                Instantly check if a new food or drug is compatible with your personal health profile.
+              </p>
+              <Alert variant="default" className="max-w-2xl mx-auto mt-6 text-left border-accent/50 bg-accent/10">
+                <Info className="h-4 w-4 text-accent" />
+                <AlertTitle className="font-semibold text-accent-foreground">Important Disclaimer</AlertTitle>
+                <AlertDescription className="text-muted-foreground">
+                  This app is not a substitute for medical advice. Always consult with a qualified healthcare professional before making any decisions about your health, medication, or diet.
+                </AlertDescription>
+              </Alert>
             </section>
 
-            <aside id="checker" aria-labelledby="checker-heading" className="lg:sticky top-8 self-start">
-               <Card className="shadow-xl shadow-primary/5 border-primary/20 dark:shadow-primary/10">
-                <CardHeader>
-                  <CardTitle id="checker-heading" className="text-3xl font-bold tracking-tight">Compatibility Checker</CardTitle>
-                  <CardDescription>Enter an item's details to check against your profile.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                     <div className="space-y-2">
-                      <Label htmlFor="item-photo" className="font-semibold">Item Photo(s) (Optional, up to 5)</Label>
-                      <div className="flex items-start gap-4">
-                        <label htmlFor="item-photo" className="flex-shrink-0 flex flex-col items-center justify-center h-28 w-28 rounded-lg border-2 border-dashed border-muted-foreground/50 cursor-pointer hover:bg-accent/10 transition-colors">
-                          <Upload className="h-8 w-8 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground mt-1 text-center">Upload Photo(s)</span>
-                        </label>
-                        <Input id="item-photo" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
-                         <div className="flex flex-wrap gap-2 flex-1">
-                          {imagePreviews.map((preview, index) => (
-                             <div key={index} className="relative flex-shrink-0">
-                              <Image src={preview} alt={`Item preview ${index + 1}`} width={80} height={80} className="h-20 w-20 object-cover rounded-lg border-2 border-border" data-ai-hint="medication product" />
-                              <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md" onClick={() => removeImage(index)}>
-                                <X className="h-3 w-3" />
-                              </Button>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+              
+              <section id="profile" aria-labelledby="profile-heading" className="space-y-6">
+                <div>
+                  <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
+                  <p className="text-muted-foreground mt-2">
+                    Your health details are stored for this session only.
+                  </p>
+                </div>
+                <div className="space-y-4">
+                  <TagList
+                    id="allergies-input"
+                    title="Allergies"
+                    Icon={Ban}
+                    items={profile.allergies}
+                    setItems={handleProfileChange('allergies')}
+                    placeholder="e.g., Penicillin"
+                    category="allergies"
+                  />
+                  <TagList
+                    id="medications-input"
+                    title="Current Medications"
+                    Icon={Pill}
+                    items={profile.medications}
+                    setItems={handleProfileChange('medications')}
+                    placeholder="e.g., Metformin 500mg"
+                    category="medications"
+                  />
+                  <TagList
+                    id="conditions-input"
+                    title="Medical Conditions"
+                    Icon={Stethoscope}
+                    items={profile.conditions}
+                    setItems={handleProfileChange('conditions')}
+                    placeholder="e.g., Type 2 Diabetes"
+                    category="conditions"
+                  />
+                </div>
+                <div className="mt-6">
+                  <Button
+                      onClick={handleGetLifestyleTips}
+                      disabled={isGettingTips || isCompatibilityWorking || (profile.allergies.length === 0 && profile.conditions.length === 0)}
+                      className="w-full text-base py-6 font-bold"
+                      variant="outline"
+                  >
+                      {isGettingTips ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lightbulb className="mr-2 h-5 w-5" />}
+                      {isGettingTips ? 'Getting Tips...' : 'Get Lifestyle Tips'}
+                  </Button>
+                </div>
+                <div className="space-y-4">
+                  {isGettingTips && (
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/2" />
+                        </CardHeader>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-1/4" />
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-5/6" />
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-1/4" />
+                                <Skeleton className="h-4 w-full" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                  )}
+                  {tips && (
+                    <Card className="animate-in fade-in-50 duration-500">
+                        <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-primary">
+                            <Leaf /> Lifestyle Tips
+                        </CardTitle>
+                        <CardDescription>
+                            General recommendations based on your profile.
+                        </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                        {tips.tips.map((tip, index) => (
+                            <div key={index} className="p-3 rounded-md border bg-background/50">
+                                <p className="font-semibold">{tip.category}</p>
+                                <p className="text-sm text-muted-foreground">{tip.tip}</p>
+                            </div>
+                        ))}
+                        <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
+                            <Info className="h-4 w-4 text-accent" />
+                            <AlertTitle className="text-accent-foreground">General Disclaimer</AlertTitle>
+                            <AlertDescription className="text-muted-foreground">
+                            {tips.disclaimer}
+                            </AlertDescription>
+                        </Alert>
+                        </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </section>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="item-name-input" className="font-semibold">Item Name</Label>
-                      <Input
-                        id="item-name-input"
-                        type="text"
-                        value={itemName}
-                        onChange={(e) => setItemName(e.target.value)}
-                        placeholder="e.g., Tylenol 500mg, Coffee"
-                        className="flex-grow text-base"
-                        aria-label="Item to check"
-                      />
-                    </div>
-                    
-                    <Button onClick={handleCheckCompatibility} disabled={isLoading || isGettingTips} className="w-full text-base py-6 font-bold">
-                      {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <HeartPulse className="mr-2 h-5 w-5" /> }
-                      {isLoading ? 'Checking...' : 'Check Compatibility'}
-                    </Button>
-                  </div>
-
-                  <div className="mt-6 space-y-4">
-                    {isLoading && (
-                       <Card>
-                         <CardHeader>
-                           <Skeleton className="h-6 w-3/4" />
-                         </CardHeader>
-                         <CardContent className="space-y-2 pt-6">
-                           <Skeleton className="h-4 w-full" />
-                           <Skeleton className="h-4 w-full" />
-                           <Skeleton className="h-4 w-5/6" />
-                         </CardContent>
-                       </Card>
-                    )}
-                    
-                    {result && result.riskLevel && (() => {
-                      const riskConfig = riskDisplayConfig[result.riskLevel!];
-                      const title = analyzedItemName || (imagePreviews.length > 0 ? "the uploaded item" : "the item");
-                      return (
-                        <Card className={cn("animate-in fade-in-50 duration-500", riskConfig.cardClass)}>
-                          <CardHeader>
-                            <CardTitle className={cn("flex items-center gap-2 text-xl", riskConfig.textClass)}>
-                              <riskConfig.Icon className="h-6 w-6" /> {riskConfig.label}
-                            </CardTitle>
-                            <CardDescription>
-                              Analysis for "{title}"
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{result.analysis}</p>
-                            {showActionButtons && (
-                              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <Button onClick={handleSuggestAlternatives} disabled={isSuggesting} variant="secondary">
-                                  {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                                  {isSuggesting ? 'Thinking...' : 'Suggest Alternatives'}
+              <aside id="checker" aria-labelledby="checker-heading" className="lg:sticky top-8 self-start">
+                 <Card className="shadow-xl shadow-primary/5 border-primary/20 dark:shadow-primary/10">
+                  <CardHeader>
+                    <CardTitle id="checker-heading" className="text-3xl font-bold tracking-tight">Compatibility Checker</CardTitle>
+                    <CardDescription>Enter an item's details to check against your profile.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                       <div className="space-y-2">
+                        <Label htmlFor="item-photo" className="font-semibold">Item Photo(s) (Optional, up to 5)</Label>
+                        <div className="flex items-start gap-4">
+                          <Button 
+                            variant="outline" 
+                            className="flex-shrink-0 flex flex-col items-center justify-center h-28 w-28 rounded-lg border-2 border-dashed border-muted-foreground/50 hover:bg-accent/10 transition-colors"
+                            onClick={() => fileInputRef.current?.click()}>
+                            <Upload className="h-8 w-8 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground mt-1 text-center">Upload Photo(s)</span>
+                          </Button>
+                          <Input id="item-photo" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" ref={fileInputRef}/>
+                           <div className="flex flex-wrap gap-2 flex-1">
+                            {imagePreviews.map((preview, index) => (
+                               <div key={index} className="relative flex-shrink-0">
+                                <Image src={preview} alt={`Item preview ${index + 1}`} width={80} height={80} className="h-20 w-20 object-cover rounded-lg border-2 border-border" data-ai-hint="medication product" />
+                                <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md" onClick={() => removeImage(index)}>
+                                  <X className="h-3 w-3" />
                                 </Button>
-                                <Button onClick={handleGetPostIngestionAdvice} disabled={isAdvising} variant="destructive">
-                                  {isAdvising ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HelpCircle className="mr-2 h-4 w-4" />}
-                                  {isAdvising ? 'Checking...' : 'Advice if Already Taken'}
-                                </Button>
-                              </div>
-                            )}
-                            <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
-                              <Info className="h-4 w-4 text-accent" />
-                              <AlertTitle className="text-accent">Medical Disclaimer</AlertTitle>
-                              <AlertDescription className="text-muted-foreground">
-                                {result.disclaimer}
-                              </AlertDescription>
-                            </Alert>
-                          </CardContent>
-                        </Card>
-                      );
-                    })()}
-
-                    {isSuggesting && (
-                      <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>
-                    )}
-                    {alternatives && (
-                       <Card className="animate-in fade-in-50 duration-500">
-                         <CardHeader>
-                           <CardTitle className="flex items-center gap-2 text-accent">
-                             <Lightbulb/> Suggested Alternatives
-                           </CardTitle>
-                         </CardHeader>
-                         <CardContent className="space-y-4">
-                            {alternatives.alternatives.map((alt, index) => (
-                              <div key={index} className="p-3 rounded-md border bg-background">
-                                <p className="font-semibold">{alt.name}</p>
-                                <p className="text-sm text-muted-foreground">{alt.reason}</p>
                               </div>
                             ))}
-                         </CardContent>
-                       </Card>
-                    )}
+                          </div>
+                        </div>
+                      </div>
 
-                    {isAdvising && (
-                       <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></CardContent></Card>
-                    )}
-                    {advice && (
-                       <Card className="border-destructive/50 bg-destructive/10 animate-in fade-in-50 duration-500">
-                         <CardHeader>
-                           <CardTitle className="flex items-center gap-2 text-destructive">
-                             <HelpCircle/> Post-Ingestion Info
-                           </CardTitle>
-                         </CardHeader>
-                         <CardContent>
-                            <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{advice.advice}</p>
-                            <Alert variant="destructive" className="mt-4 bg-transparent">
-                              <Info className="h-4 w-4" />
-                              <AlertTitle>Urgent Disclaimer</AlertTitle>
-                              <AlertDescription>
-                                {advice.disclaimer}
-                              </AlertDescription>
-                            </Alert>
-                         </CardContent>
-                       </Card>
-                    )}
-                    
-                    {!isCompatibilityWorking && !hasCompatibilityContent && (
-                       <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
-                         <p className="text-muted-foreground">
-                          Your compatibility report will appear here.
-                         </p>
-                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </aside>
+                      <div className="space-y-2">
+                        <Label htmlFor="item-name-input" className="font-semibold">Item Name</Label>
+                        <Input
+                          id="item-name-input"
+                          type="text"
+                          value={itemName}
+                          onChange={(e) => setItemName(e.target.value)}
+                          placeholder="e.g., Tylenol 500mg, Coffee"
+                          className="flex-grow text-base"
+                          aria-label="Item to check"
+                        />
+                      </div>
+                      
+                      <Button onClick={handleCheckCompatibility} disabled={isLoading || isGettingTips} className="w-full text-base py-6 font-bold">
+                        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <HeartPulse className="mr-2 h-5 w-5" /> }
+                        {isLoading ? 'Checking...' : 'Check Compatibility'}
+                      </Button>
+                    </div>
+
+                    <div className="mt-6 space-y-4">
+                      {isLoading && (
+                         <Card>
+                           <CardHeader>
+                             <Skeleton className="h-6 w-3/4" />
+                           </CardHeader>
+                           <CardContent className="space-y-2 pt-6">
+                             <Skeleton className="h-4 w-full" />
+                             <Skeleton className="h-4 w-full" />
+                             <Skeleton className="h-4 w-5/6" />
+                           </CardContent>
+                         </Card>
+                      )}
+                      
+                      {result && result.riskLevel && (() => {
+                        const riskConfig = riskDisplayConfig[result.riskLevel!];
+                        const title = analyzedItemName || (imagePreviews.length > 0 ? "the uploaded item" : "the item");
+                        return (
+                          <Card className={cn("animate-in fade-in-50 duration-500", riskConfig.cardClass)}>
+                            <CardHeader>
+                              <CardTitle className={cn("flex items-center gap-2 text-xl", riskConfig.textClass)}>
+                                <riskConfig.Icon className="h-6 w-6" /> {riskConfig.label}
+                              </CardTitle>
+                              <CardDescription>
+                                Analysis for "{title}"
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{result.analysis}</p>
+                              {showActionButtons && (
+                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <Button onClick={handleSuggestAlternatives} disabled={isSuggesting} variant="secondary">
+                                    {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                                    {isSuggesting ? 'Thinking...' : 'Suggest Alternatives'}
+                                  </Button>
+                                  <Button onClick={handleGetPostIngestionAdvice} disabled={isAdvising} variant="destructive">
+                                    {isAdvising ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HelpCircle className="mr-2 h-4 w-4" />}
+                                    {isAdvising ? 'Checking...' : 'Advice if Already Taken'}
+                                  </Button>
+                                </div>
+                              )}
+                              <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
+                                <Info className="h-4 w-4 text-accent" />
+                                <AlertTitle className="text-accent-foreground">Medical Disclaimer</AlertTitle>
+                                <AlertDescription className="text-muted-foreground">
+                                  {result.disclaimer}
+                                </AlertDescription>
+                              </Alert>
+                            </CardContent>
+                          </Card>
+                        );
+                      })()}
+
+                      {isSuggesting && (
+                        <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>
+                      )}
+                      {alternatives && (
+                         <Card className="animate-in fade-in-50 duration-500">
+                           <CardHeader>
+                             <CardTitle className="flex items-center gap-2 text-accent-foreground">
+                               <Lightbulb/> Suggested Alternatives
+                             </CardTitle>
+                           </CardHeader>
+                           <CardContent className="space-y-4">
+                              {alternatives.alternatives.map((alt, index) => (
+                                <div key={index} className="p-3 rounded-md border bg-background">
+                                  <p className="font-semibold">{alt.name}</p>
+                                  <p className="text-sm text-muted-foreground">{alt.reason}</p>
+                                </div>
+                              ))}
+                           </CardContent>
+                         </Card>
+                      )}
+
+                      {isAdvising && (
+                         <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></CardContent></Card>
+                      )}
+                      {advice && (
+                         <Card className="border-destructive/50 bg-destructive/10 animate-in fade-in-50 duration-500">
+                           <CardHeader>
+                             <CardTitle className="flex items-center gap-2 text-destructive">
+                               <HelpCircle/> Post-Ingestion Info
+                             </CardTitle>
+                           </CardHeader>
+                           <CardContent>
+                              <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{advice.advice}</p>
+                              <Alert variant="destructive" className="mt-4 bg-transparent">
+                                <Info className="h-4 w-4" />
+                                <AlertTitle>Urgent Disclaimer</AlertTitle>
+                                <AlertDescription>
+                                  {advice.disclaimer}
+                                </AlertDescription>
+                              </Alert>
+                           </CardContent>
+                         </Card>
+                      )}
+                      
+                      {!isCompatibilityWorking && !hasCompatibilityContent && (
+                         <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
+                           <p className="text-muted-foreground">
+                            Your compatibility report will appear here.
+                           </p>
+                         </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </aside>
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
