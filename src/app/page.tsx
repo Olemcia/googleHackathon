@@ -150,7 +150,6 @@ export default function Home() {
     setResult(null);
     setAlternatives(null);
     setAdvice(null);
-    setTips(null);
     setAnalyzedItemName(currentItemName);
 
     const input: CheckItemCompatibilityInput = {
@@ -403,6 +402,25 @@ export default function Home() {
                          </CardContent>
                        </Card>
                     )}
+                    
+                    {isGettingTips && (
+                      <Card>
+                          <CardHeader>
+                              <Skeleton className="h-6 w-1/2" />
+                          </CardHeader>
+                          <CardContent className="pt-6 space-y-4">
+                              <div className="space-y-2">
+                                  <Skeleton className="h-4 w-1/4" />
+                                  <Skeleton className="h-4 w-full" />
+                                  <Skeleton className="h-4 w-5/6" />
+                              </div>
+                              <div className="space-y-2">
+                                  <Skeleton className="h-4 w-1/4" />
+                                  <Skeleton className="h-4 w-full" />
+                              </div>
+                          </CardContent>
+                      </Card>
+                    )}
 
                     {result && result.riskLevel && (() => {
                       const riskConfig = riskDisplayConfig[result.riskLevel!];
@@ -442,7 +460,7 @@ export default function Home() {
                         </Card>
                       );
                     })()}
-                    
+
                     {isSuggesting && (
                       <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>
                     )}
@@ -486,25 +504,7 @@ export default function Home() {
                          </CardContent>
                        </Card>
                     )}
-
-                    {isGettingTips && (
-                      <Card>
-                          <CardHeader>
-                              <Skeleton className="h-6 w-1/2" />
-                          </CardHeader>
-                          <CardContent className="pt-6 space-y-4">
-                              <div className="space-y-2">
-                                  <Skeleton className="h-4 w-1/4" />
-                                  <Skeleton className="h-4 w-full" />
-                                  <Skeleton className="h-4 w-5/6" />
-                              </div>
-                              <div className="space-y-2">
-                                  <Skeleton className="h-4 w-1/4" />
-                                  <Skeleton className="h-4 w-full" />
-                              </div>
-                          </CardContent>
-                      </Card>
-                    )}
+                    
                     {tips && (
                       <Card className="animate-in fade-in-50 duration-500">
                           <CardHeader>
