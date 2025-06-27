@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import {
   Ban,
@@ -17,8 +17,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   ShieldX,
-  LogOut,
-  User as UserIcon,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
@@ -45,11 +43,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/hooks/use-auth';
-import { auth, db, isFirebaseConfigured } from '@/lib/firebase';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
-import { AuthDialog } from '@/components/auth-dialog';
 
 interface UserProfile {
   allergies: string[];
@@ -58,13 +51,11 @@ interface UserProfile {
 }
 
 export default function Home() {
-  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile>({
     allergies: [],
     medications: [],
     conditions: [],
   });
-  const [profileLoading, setProfileLoading] = useState(true);
   const [itemName, setItemName] = useState('');
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [result, setResult] = useState<CheckItemCompatibilityOutput | null>(null);
@@ -75,40 +66,6 @@ export default function Home() {
   const [isAdvising, setIsAdvising] = useState(false);
   const { toast } = useToast();
   const [analyzedItemName, setAnalyzedItemName] = useState('');
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (user && db) {
-        setProfileLoading(true);
-        try {
-          const docRef = doc(db, 'users', user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
-          } else {
-            // Create a profile for a new user
-            const initialProfile: UserProfile = { allergies: [], medications: [], conditions: [] };
-            await setDoc(docRef, initialProfile);
-            setProfile(initialProfile);
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          toast({
-            title: "Error",
-            description: "Could not fetch your profile. Please try again.",
-            variant: "destructive",
-          });
-        } finally {
-          setProfileLoading(false);
-        }
-      } else {
-        // If no user, use a default empty profile
-        setProfile({ allergies: [], medications: [], conditions: [] });
-        setProfileLoading(false);
-      }
-    };
-    fetchProfile();
-  }, [user, toast]);
 
   const riskDisplayConfig = {
     None: {
@@ -137,23 +94,9 @@ export default function Home() {
     },
   };
 
-  const handleProfileChange = (field: keyof UserProfile) => async (items: string[]) => {
+  const handleProfileChange = (field: keyof UserProfile) => (items: string[]) => {
     const newProfile = { ...profile, [field]: items };
     setProfile(newProfile);
-
-    // Only persist if user is logged in and firebase is configured
-    if (user && db) {
-      try {
-        const docRef = doc(db, 'users', user.uid);
-        await setDoc(docRef, newProfile, { merge: true });
-      } catch (error) {
-        toast({
-          title: "Update Failed",
-          description: `Could not save your ${field}.`,
-          variant: "destructive",
-        });
-      }
-    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,12 +175,6 @@ export default function Home() {
     }
   };
   
-  const handleLogout = async () => {
-    if (!auth) return;
-    await signOut(auth);
-    toast({ title: 'Logged out successfully.' });
-  }
-
   const handleSuggestAlternatives = async () => {
     if (!analyzedItemName) return;
     setIsSuggesting(true);
@@ -289,19 +226,10 @@ export default function Home() {
   };
 
   const showActionButtons = result && result.riskLevel && ['Low', 'Moderate', 'High'].includes(result.riskLevel);
-  const isAppDisabled = profileLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
        <header className="absolute top-4 right-4 z-50 flex items-center gap-4">
-        {user ? (
-            <div className="flex items-center gap-4">
-                <span className="text-sm font-medium flex items-center gap-2"><UserIcon className="h-4 w-4" /> {user.email}</span>
-                <Button variant="outline" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
-            </div>
-        ) : (
-            <AuthDialog />
-        )}
         <ThemeToggle />
       </header>
       <main className="p-4 py-8 md:p-8 md:py-12 lg:p-12 lg:py-16">
@@ -325,59 +253,44 @@ export default function Home() {
             </Alert>
           </section>
 
-          <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12", isAppDisabled && "opacity-50 pointer-events-none")}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
             
             <section id="profile" aria-labelledby="profile-heading" className="space-y-6">
               <div>
                 <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
                 <p className="text-muted-foreground mt-2">
-                  {isFirebaseConfigured
-                    ? user
-                      ? 'Your health details are saved to your account.'
-                      : 'Log in to save your profile. Currently, data is stored for this session only.'
-                    : 'Configure Firebase in your .env file to enable user accounts and data persistence.'}
+                  Your health details are stored for this session only.
                 </p>
               </div>
-              {profileLoading ? (
-                 <div className="space-y-4">
-                  <Skeleton className="h-48 w-full" />
-                  <Skeleton className="h-48 w-full" />
-                  <Skeleton className="h-48 w-full" />
-                 </div>
-              ): (
-                <div className="space-y-4">
-                  <TagList
-                    id="allergies-input"
-                    title="Allergies"
-                    Icon={Ban}
-                    items={profile.allergies}
-                    setItems={handleProfileChange('allergies')}
-                    placeholder="e.g., Penicillin"
-                    category="allergies"
-                    disabled={isAppDisabled}
-                  />
-                  <TagList
-                    id="medications-input"
-                    title="Current Medications"
-                    Icon={Pill}
-                    items={profile.medications}
-                    setItems={handleProfileChange('medications')}
-                    placeholder="e.g., Metformin 500mg"
-                    category="medications"
-                    disabled={isAppDisabled}
-                  />
-                  <TagList
-                    id="conditions-input"
-                    title="Medical Conditions"
-                    Icon={Stethoscope}
-                    items={profile.conditions}
-                    setItems={handleProfileChange('conditions')}
-                    placeholder="e.g., Type 2 Diabetes"
-                    category="conditions"
-                    disabled={isAppDisabled}
-                  />
-                </div>
-              )}
+              <div className="space-y-4">
+                <TagList
+                  id="allergies-input"
+                  title="Allergies"
+                  Icon={Ban}
+                  items={profile.allergies}
+                  setItems={handleProfileChange('allergies')}
+                  placeholder="e.g., Penicillin"
+                  category="allergies"
+                />
+                <TagList
+                  id="medications-input"
+                  title="Current Medications"
+                  Icon={Pill}
+                  items={profile.medications}
+                  setItems={handleProfileChange('medications')}
+                  placeholder="e.g., Metformin 500mg"
+                  category="medications"
+                />
+                <TagList
+                  id="conditions-input"
+                  title="Medical Conditions"
+                  Icon={Stethoscope}
+                  items={profile.conditions}
+                  setItems={handleProfileChange('conditions')}
+                  placeholder="e.g., Type 2 Diabetes"
+                  category="conditions"
+                />
+              </div>
             </section>
 
             <aside id="checker" aria-labelledby="checker-heading" className="lg:sticky top-8 self-start">
@@ -528,7 +441,7 @@ export default function Home() {
                     {!isLoading && !result && (
                        <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
                          <p className="text-muted-foreground">
-                          {user ? 'Your compatibility report will appear here.' : 'Log in or fill out your profile to get started.'}
+                          Your compatibility report will appear here.
                          </p>
                        </div>
                     )}
