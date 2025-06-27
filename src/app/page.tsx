@@ -139,7 +139,16 @@ export default function Home() {
 
     try {
       const response = await checkItemCompatibility(input);
-      setResult(response);
+      if (!response.isValidItem) {
+        toast({
+          title: 'Invalid Item',
+          description: 'Please enter a valid drug, food, or supplement name.',
+          variant: 'destructive',
+        });
+        setResult(null);
+      } else {
+        setResult(response);
+      }
     } catch (error) {
       console.error('Compatibility check failed:', error);
       toast({
@@ -202,7 +211,7 @@ export default function Home() {
     }
   };
 
-  const showActionButtons = result && (result.riskLevel === 'Moderate' || result.riskLevel === 'High');
+  const showActionButtons = result && result.riskLevel && (result.riskLevel === 'Moderate' || result.riskLevel === 'High');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
@@ -247,6 +256,7 @@ export default function Home() {
                   items={profile.allergies}
                   setItems={handleProfileChange('allergies')}
                   placeholder="e.g., Penicillin"
+                  category="allergies"
                 />
                 <TagList
                   id="medications-input"
@@ -255,6 +265,7 @@ export default function Home() {
                   items={profile.medications}
                   setItems={handleProfileChange('medications')}
                   placeholder="e.g., Metformin 500mg"
+                  category="medications"
                 />
                 <TagList
                   id="conditions-input"
@@ -263,6 +274,7 @@ export default function Home() {
                   items={profile.conditions}
                   setItems={handleProfileChange('conditions')}
                   placeholder="e.g., Type 2 Diabetes"
+                  category="conditions"
                 />
               </div>
             </section>
@@ -331,8 +343,8 @@ export default function Home() {
                        </Card>
                     )}
 
-                    {result && (() => {
-                      const riskConfig = riskDisplayConfig[result.riskLevel];
+                    {result && result.riskLevel && (() => {
+                      const riskConfig = riskDisplayConfig[result.riskLevel!];
                       return (
                         <Card className={cn("animate-in fade-in-50 duration-500", riskConfig.cardClass)}>
                           <CardHeader>
