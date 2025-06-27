@@ -31,6 +31,9 @@ const CheckItemCompatibilityInputSchema = z.object({
 export type CheckItemCompatibilityInput = z.infer<typeof CheckItemCompatibilityInputSchema>;
 
 const CheckItemCompatibilityOutputSchema = z.object({
+  riskLevel: z
+    .enum(['None', 'Low', 'Moderate', 'High'])
+    .describe('The assessed risk level for the user. "None" if it appears safe, "Low" for minor considerations, "Moderate" for notable interactions, "High" for significant contraindications.'),
   analysis: z.string().describe("The AI-generated analysis of the item's compatibility with the user's health profile."),
   disclaimer: z.string().describe('A mandatory medical disclaimer.'),
 });
@@ -59,7 +62,12 @@ const checkItemCompatibilityPrompt = ai.definePrompt({
 {{/if}}
 
 **Task:**
-Acting as a cautious medical information AI, analyze potential interactions, contraindications, and risks for the user based on their specific health profile and the item they want to take. If a photo is provided, use it as the primary source for identifying the item. If the "Name" field seems to contradict the photo, prioritize the visual information from the photo. Provide a clear, easy-to-understand explanation. Start with a direct safety conclusion (e.g., "Potential Risk Identified," "Appears Safe," "Use with Caution") and then explain the reasoning in detail. Do not provide medical advice, but explain the known biological and chemical interactions.
+1.  Act as a cautious medical information AI.
+2.  Analyze potential interactions, contraindications, and risks for the user based on their specific health profile and the item they want to take.
+3.  If a photo is provided, use it as the primary source for identifying the item. If the "Name" field seems to contradict the photo, prioritize the visual information from the photo.
+4.  Based on your analysis, determine a risk level and set the 'riskLevel' field to one of the following: "None", "Low", "Moderate", or "High".
+5.  Provide a clear, easy-to-understand explanation in the 'analysis' field. Start with a direct safety conclusion (e.g., "High Risk Identified," "Appears Safe," "Use with Caution") and then explain the reasoning in detail.
+6.  Do not provide medical advice, but explain the known biological and chemical interactions.
   `,
   config: {
     safetySettings: [
@@ -92,6 +100,7 @@ const checkItemCompatibilityFlow = ai.defineFlow(
   async input => {
     const {output} = await checkItemCompatibilityPrompt(input);
     return {
+      riskLevel: output!.riskLevel,
       analysis: output!.analysis,
       disclaimer: 'This app is not a substitute for medical advice. Always consult with a qualified healthcare professional before making any decisions about your health, medication, or diet.',
     };

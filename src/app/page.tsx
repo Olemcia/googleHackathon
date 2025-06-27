@@ -11,6 +11,9 @@ import {
   HeartPulse,
   Upload,
   X,
+  Search,
+  HelpCircle,
+  Lightbulb,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
@@ -24,6 +27,16 @@ import {
   type CheckItemCompatibilityInput,
   type CheckItemCompatibilityOutput,
 } from '@/ai/flows/check-item-compatibility';
+import {
+  suggestAlternatives,
+  type SuggestAlternativesInput,
+  type SuggestAlternativesOutput,
+} from '@/ai/flows/suggest-alternatives';
+import {
+  getPostIngestionAdvice,
+  type GetPostIngestionAdviceInput,
+  type GetPostIngestionAdviceOutput,
+} from '@/ai/flows/get-post-ingestion-advice';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -35,14 +48,18 @@ interface UserProfile {
 
 export default function Home() {
   const [profile, setProfile] = useState<UserProfile>({
-    allergies: ['Peanuts', 'Aspirin'],
-    medications: ['Lisinopril 10mg'],
-    conditions: ['High Blood Pressure'],
+    allergies: [],
+    medications: [],
+    conditions: [],
   });
-  const [itemName, setItemName] = useState('Ibuprofen 200mg');
+  const [itemName, setItemName] = useState('');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [result, setResult] = useState<CheckItemCompatibilityOutput | null>(null);
+  const [alternatives, setAlternatives] = useState<SuggestAlternativesOutput | null>(null);
+  const [advice, setAdvice] = useState<GetPostIngestionAdviceOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isAdvising, setIsAdvising] = useState(false);
   const { toast } = useToast();
   const [analyzedItemName, setAnalyzedItemName] = useState('');
 
@@ -79,6 +96,9 @@ export default function Home() {
     }
     setIsLoading(true);
     setResult(null);
+    setAlternatives(null);
+    setAdvice(null);
+    setAnalyzedItemName(currentItemName);
 
     const input: CheckItemCompatibilityInput = {
       userProfile: profile,
@@ -89,7 +109,6 @@ export default function Home() {
     try {
       const response = await checkItemCompatibility(input);
       setResult(response);
-      setAnalyzedItemName(currentItemName);
     } catch (error) {
       console.error('Compatibility check failed:', error);
       toast({
@@ -101,6 +120,58 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+
+  const handleSuggestAlternatives = async () => {
+    if (!analyzedItemName) return;
+    setIsSuggesting(true);
+    setAlternatives(null);
+
+    const input: SuggestAlternativesInput = {
+      userProfile: profile,
+      itemName: analyzedItemName,
+    };
+
+    try {
+      const response = await suggestAlternatives(input);
+      setAlternatives(response);
+    } catch (error) {
+      console.error('Suggest alternatives failed:', error);
+      toast({
+        title: 'Suggestion Failed',
+        description: 'Could not get suggestions. Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
+  const handleGetPostIngestionAdvice = async () => {
+    if (!analyzedItemName) return;
+    setIsAdvising(true);
+    setAdvice(null);
+
+    const input: GetPostIngestionAdviceInput = {
+      userProfile: profile,
+      itemName: analyzedItemName,
+    };
+
+    try {
+      const response = await getPostIngestionAdvice(input);
+      setAdvice(response);
+    } catch (error) {
+      console.error('Get advice failed:', error);
+      toast({
+        title: 'Advice Failed',
+        description: 'Could not get advice. Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAdvising(false);
+    }
+  };
+
+  const showActionButtons = result && (result.riskLevel === 'Moderate' || result.riskLevel === 'High');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
@@ -114,7 +185,7 @@ export default function Home() {
               <HeartPulse className="h-10 w-10 text-primary" />
             </div>
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
-              Health Harmony AI
+              MediMatch AI
             </h1>
             <p className="max-w-2xl mx-auto mt-4 text-lg text-muted-foreground">
               Instantly check if a new food or drug is compatible with your personal health profile.
@@ -210,24 +281,18 @@ export default function Home() {
                     </div>
                     
                     <Button onClick={handleCheckCompatibility} disabled={isLoading} className="w-full text-base py-6 font-bold">
-                      {isLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                          Checking...
-                        </>
-                      ) : (
-                        'Check Compatibility'
-                      )}
+                      {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <HeartPulse className="mr-2 h-5 w-5" /> }
+                      {isLoading ? 'Checking...' : 'Check Compatibility'}
                     </Button>
                   </div>
 
-                  <div className="mt-6 space-y-4 min-h-[300px]">
+                  <div className="mt-6 space-y-4">
                     {isLoading && (
                        <Card>
                          <CardHeader>
                            <Skeleton className="h-6 w-3/4" />
                          </CardHeader>
-                         <CardContent className="space-y-2">
+                         <CardContent className="space-y-2 pt-6">
                            <Skeleton className="h-4 w-full" />
                            <Skeleton className="h-4 w-full" />
                            <Skeleton className="h-4 w-5/6" />
@@ -244,6 +309,18 @@ export default function Home() {
                         </CardHeader>
                         <CardContent>
                           <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{result.analysis}</p>
+                          {showActionButtons && (
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <Button onClick={handleSuggestAlternatives} disabled={isSuggesting} variant="secondary">
+                                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                                {isSuggesting ? 'Thinking...' : 'Suggest Alternatives'}
+                              </Button>
+                              <Button onClick={handleGetPostIngestionAdvice} disabled={isAdvising} variant="destructive">
+                                {isAdvising ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HelpCircle className="mr-2 h-4 w-4" />}
+                                {isAdvising ? 'Checking...' : 'Already Took It?'}
+                              </Button>
+                            </div>
+                          )}
                           <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
                             <Info className="h-4 w-4 text-accent" />
                             <AlertTitle className="text-accent-foreground">Medical Disclaimer</AlertTitle>
@@ -255,8 +332,52 @@ export default function Home() {
                       </Card>
                     )}
                     
+                    {isSuggesting && (
+                      <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>
+                    )}
+                    {alternatives && (
+                       <Card className="animate-in fade-in-50 duration-500">
+                         <CardHeader>
+                           <CardTitle className="flex items-center gap-2 text-accent-foreground">
+                             <Lightbulb/> Suggested Alternatives
+                           </CardTitle>
+                         </CardHeader>
+                         <CardContent className="space-y-4">
+                            {alternatives.alternatives.map((alt, index) => (
+                              <div key={index} className="p-3 rounded-md border bg-background">
+                                <p className="font-semibold">{alt.name}</p>
+                                <p className="text-sm text-muted-foreground">{alt.reason}</p>
+                              </div>
+                            ))}
+                         </CardContent>
+                       </Card>
+                    )}
+
+                    {isAdvising && (
+                       <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></CardContent></Card>
+                    )}
+                    {advice && (
+                       <Card className="border-destructive/50 bg-destructive/10 animate-in fade-in-50 duration-500">
+                         <CardHeader>
+                           <CardTitle className="flex items-center gap-2 text-destructive">
+                             <HelpCircle/> Post-Ingestion Info
+                           </CardTitle>
+                         </CardHeader>
+                         <CardContent>
+                            <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{advice.advice}</p>
+                            <Alert variant="destructive" className="mt-4 bg-transparent">
+                              <Info className="h-4 w-4" />
+                              <AlertTitle>Urgent Disclaimer</AlertTitle>
+                              <AlertDescription>
+                                {advice.disclaimer}
+                              </AlertDescription>
+                            </Alert>
+                         </CardContent>
+                       </Card>
+                    )}
+
                     {!isLoading && !result && (
-                       <div className="flex items-center justify-center text-center h-full py-10 px-4 border-2 border-dashed rounded-lg">
+                       <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
                          <p className="text-muted-foreground">Your compatibility report will appear here.</p>
                        </div>
                     )}
