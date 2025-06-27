@@ -261,8 +261,8 @@ export default function Home() {
 
 
   const showActionButtons = result && result.riskLevel && ['Low', 'Moderate', 'High'].includes(result.riskLevel);
-  const isWorking = isLoading || isSuggesting || isAdvising || isGettingTips;
-  const hasContent = result || alternatives || advice || tips;
+  const isCompatibilityWorking = isLoading || isSuggesting || isAdvising;
+  const hasCompatibilityContent = result || alternatives || advice;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
@@ -331,13 +331,60 @@ export default function Home() {
               <div className="mt-6">
                 <Button
                     onClick={handleGetLifestyleTips}
-                    disabled={isGettingTips || (profile.allergies.length === 0 && profile.conditions.length === 0)}
+                    disabled={isGettingTips || isCompatibilityWorking || (profile.allergies.length === 0 && profile.conditions.length === 0)}
                     className="w-full text-base py-6 font-bold"
                     variant="outline"
                 >
                     {isGettingTips ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lightbulb className="mr-2 h-5 w-5" />}
                     {isGettingTips ? 'Getting Tips...' : 'Get Lifestyle Tips'}
                 </Button>
+              </div>
+              <div className="space-y-4">
+                {isGettingTips && (
+                  <Card>
+                      <CardHeader>
+                          <Skeleton className="h-6 w-1/2" />
+                      </CardHeader>
+                      <CardContent className="pt-6 space-y-4">
+                          <div className="space-y-2">
+                              <Skeleton className="h-4 w-1/4" />
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-5/6" />
+                          </div>
+                          <div className="space-y-2">
+                              <Skeleton className="h-4 w-1/4" />
+                              <Skeleton className="h-4 w-full" />
+                          </div>
+                      </CardContent>
+                  </Card>
+                )}
+                {tips && (
+                  <Card className="animate-in fade-in-50 duration-500">
+                      <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-accent">
+                          <Leaf /> Lifestyle Tips
+                      </CardTitle>
+                      <CardDescription>
+                          General recommendations based on your profile.
+                      </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                      {tips.tips.map((tip, index) => (
+                          <div key={index} className="p-3 rounded-md border bg-background/50">
+                              <p className="font-semibold">{tip.category}</p>
+                              <p className="text-sm text-muted-foreground">{tip.tip}</p>
+                          </div>
+                      ))}
+                      <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
+                          <Info className="h-4 w-4 text-accent" />
+                          <AlertTitle className="text-accent">General Disclaimer</AlertTitle>
+                          <AlertDescription className="text-muted-foreground">
+                          {tips.disclaimer}
+                          </AlertDescription>
+                      </Alert>
+                      </CardContent>
+                  </Card>
+                )}
               </div>
             </section>
 
@@ -383,7 +430,7 @@ export default function Home() {
                       />
                     </div>
                     
-                    <Button onClick={handleCheckCompatibility} disabled={isLoading} className="w-full text-base py-6 font-bold">
+                    <Button onClick={handleCheckCompatibility} disabled={isLoading || isGettingTips} className="w-full text-base py-6 font-bold">
                       {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <HeartPulse className="mr-2 h-5 w-5" /> }
                       {isLoading ? 'Checking...' : 'Check Compatibility'}
                     </Button>
@@ -403,25 +450,6 @@ export default function Home() {
                        </Card>
                     )}
                     
-                    {isGettingTips && (
-                      <Card>
-                          <CardHeader>
-                              <Skeleton className="h-6 w-1/2" />
-                          </CardHeader>
-                          <CardContent className="pt-6 space-y-4">
-                              <div className="space-y-2">
-                                  <Skeleton className="h-4 w-1/4" />
-                                  <Skeleton className="h-4 w-full" />
-                                  <Skeleton className="h-4 w-5/6" />
-                              </div>
-                              <div className="space-y-2">
-                                  <Skeleton className="h-4 w-1/4" />
-                                  <Skeleton className="h-4 w-full" />
-                              </div>
-                          </CardContent>
-                      </Card>
-                    )}
-
                     {result && result.riskLevel && (() => {
                       const riskConfig = riskDisplayConfig[result.riskLevel!];
                       const title = analyzedItemName || (imagePreviews.length > 0 ? "the uploaded item" : "the item");
@@ -505,38 +533,10 @@ export default function Home() {
                        </Card>
                     )}
                     
-                    {tips && (
-                      <Card className="animate-in fade-in-50 duration-500">
-                          <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-accent">
-                              <Leaf /> Lifestyle Tips
-                          </CardTitle>
-                          <CardDescription>
-                              General recommendations based on your profile.
-                          </CardDescription>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                          {tips.tips.map((tip, index) => (
-                              <div key={index} className="p-3 rounded-md border bg-background/50">
-                                  <p className="font-semibold">{tip.category}</p>
-                                  <p className="text-sm text-muted-foreground">{tip.tip}</p>
-                              </div>
-                          ))}
-                          <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
-                              <Info className="h-4 w-4 text-accent" />
-                              <AlertTitle className="text-accent">General Disclaimer</AlertTitle>
-                              <AlertDescription className="text-muted-foreground">
-                              {tips.disclaimer}
-                              </AlertDescription>
-                          </Alert>
-                          </CardContent>
-                      </Card>
-                    )}
-
-                    {!isWorking && !hasContent && (
+                    {!isCompatibilityWorking && !hasCompatibilityContent && (
                        <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
                          <p className="text-muted-foreground">
-                          Your compatibility report or lifestyle tips will appear here.
+                          Your compatibility report will appear here.
                          </p>
                        </div>
                     )}
