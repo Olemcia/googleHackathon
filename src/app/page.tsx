@@ -14,6 +14,9 @@ import {
   Search,
   HelpCircle,
   Lightbulb,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
@@ -39,6 +42,7 @@ import {
 } from '@/ai/flows/get-post-ingestion-advice';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { cn } from '@/lib/utils';
 
 interface UserProfile {
   allergies: string[];
@@ -62,6 +66,33 @@ export default function Home() {
   const [isAdvising, setIsAdvising] = useState(false);
   const { toast } = useToast();
   const [analyzedItemName, setAnalyzedItemName] = useState('');
+
+  const riskDisplayConfig = {
+    None: {
+      label: 'Safe',
+      Icon: ShieldCheck,
+      cardClass: 'border-green-500/50 bg-green-500/5',
+      textClass: 'text-green-700 dark:text-green-400',
+    },
+    Low: {
+      label: 'Low Risk',
+      Icon: ShieldAlert,
+      cardClass: 'border-yellow-500/50 bg-yellow-500/5',
+      textClass: 'text-yellow-700 dark:text-yellow-400',
+    },
+    Moderate: {
+      label: 'Moderate Risk',
+      Icon: ShieldAlert,
+      cardClass: 'border-orange-500/50 bg-orange-500/5',
+      textClass: 'text-orange-600 dark:text-orange-400',
+    },
+    High: {
+      label: 'High Risk',
+      Icon: ShieldX,
+      cardClass: 'border-destructive/50 bg-destructive/10',
+      textClass: 'text-destructive',
+    },
+  };
 
   const handleProfileChange = (field: keyof UserProfile) => (items: string[]) => {
     setProfile((prev) => ({ ...prev, [field]: items }));
@@ -300,37 +331,43 @@ export default function Home() {
                        </Card>
                     )}
 
-                    {result && (
-                      <Card className="border-primary/30 bg-primary/5 animate-in fade-in-50 duration-500">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-primary">
-                            <HeartPulse/> Analysis for "{analyzedItemName || 'Uploaded Item'}"
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{result.analysis}</p>
-                          {showActionButtons && (
-                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <Button onClick={handleSuggestAlternatives} disabled={isSuggesting} variant="secondary">
-                                {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                                {isSuggesting ? 'Thinking...' : 'Suggest Alternatives'}
-                              </Button>
-                              <Button onClick={handleGetPostIngestionAdvice} disabled={isAdvising} variant="destructive">
-                                {isAdvising ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HelpCircle className="mr-2 h-4 w-4" />}
-                                {isAdvising ? 'Checking...' : 'Already Took It?'}
-                              </Button>
-                            </div>
-                          )}
-                          <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
-                            <Info className="h-4 w-4 text-accent" />
-                            <AlertTitle className="text-accent-foreground">Medical Disclaimer</AlertTitle>
-                            <AlertDescription className="text-muted-foreground">
-                              {result.disclaimer}
-                            </AlertDescription>
-                          </Alert>
-                        </CardContent>
-                      </Card>
-                    )}
+                    {result && (() => {
+                      const riskConfig = riskDisplayConfig[result.riskLevel];
+                      return (
+                        <Card className={cn("animate-in fade-in-50 duration-500", riskConfig.cardClass)}>
+                          <CardHeader>
+                            <CardTitle className={cn("flex items-center gap-2 text-xl", riskConfig.textClass)}>
+                              <riskConfig.Icon className="h-6 w-6" /> {riskConfig.label}
+                            </CardTitle>
+                            <CardDescription>
+                              Analysis for "{analyzedItemName || 'the uploaded item'}"
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">{result.analysis}</p>
+                            {showActionButtons && (
+                              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Button onClick={handleSuggestAlternatives} disabled={isSuggesting} variant="secondary">
+                                  {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                                  {isSuggesting ? 'Thinking...' : 'Suggest Alternatives'}
+                                </Button>
+                                <Button onClick={handleGetPostIngestionAdvice} disabled={isAdvising} variant="destructive">
+                                  {isAdvising ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HelpCircle className="mr-2 h-4 w-4" />}
+                                  {isAdvising ? 'Checking...' : 'Already Took It?'}
+                                </Button>
+                              </div>
+                            )}
+                            <Alert variant="default" className="mt-6 border-accent/50 bg-transparent">
+                              <Info className="h-4 w-4 text-accent" />
+                              <AlertTitle className="text-accent-foreground">Medical Disclaimer</AlertTitle>
+                              <AlertDescription className="text-muted-foreground">
+                                {result.disclaimer}
+                              </AlertDescription>
+                            </Alert>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
                     
                     {isSuggesting && (
                       <Card><CardContent className="pt-6 space-y-2"><Skeleton className="h-4 w-1/3" /><Skeleton className="h-4 w-2/3" /></CardContent></Card>
