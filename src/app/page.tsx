@@ -288,7 +288,7 @@ export default function Home() {
     }
   };
 
-  const showActionButtons = result && result.riskLevel && (result.riskLevel === 'Moderate' || result.riskLevel === 'High');
+  const showActionButtons = result && result.riskLevel && ['Low', 'Moderate', 'High'].includes(result.riskLevel);
   const isAppDisabled = profileLoading;
 
   return (
@@ -461,7 +461,7 @@ export default function Home() {
                                 </Button>
                                 <Button onClick={handleGetPostIngestionAdvice} disabled={isAdvising} variant="destructive">
                                   {isAdvising ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HelpCircle className="mr-2 h-4 w-4" />}
-                                  {isAdvising ? 'Checking...' : 'Already Took It?'}
+                                  {isAdvising ? 'Checking...' : 'Advice if Already Taken'}
                                 </Button>
                               </div>
                             )}
@@ -538,3 +538,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
