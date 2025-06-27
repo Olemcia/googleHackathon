@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import {
   Ban,
@@ -17,6 +17,9 @@ import {
   ShieldCheck,
   ShieldAlert,
   ShieldX,
+  LogOut,
+  User as UserIcon,
+  AlertTriangle,
 } from 'lucide-react';
 import { TagList } from '@/components/tag-list';
 import { Button } from '@/components/ui/button';
@@ -43,6 +46,11 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/hooks/use-auth';
+import { auth, db, isFirebaseEnabled } from '@/lib/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { AuthDialog } from '@/components/auth-dialog';
 
 interface UserProfile {
   allergies: string[];
@@ -51,13 +59,15 @@ interface UserProfile {
 }
 
 export default function Home() {
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile>({
     allergies: [],
     medications: [],
     conditions: [],
   });
+  const [profileLoading, setProfileLoading] = useState(true);
   const [itemName, setItemName] = useState('');
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [result, setResult] = useState<CheckItemCompatibilityOutput | null>(null);
   const [alternatives, setAlternatives] = useState<SuggestAlternativesOutput | null>(null);
   const [advice, setAdvice] = useState<GetPostIngestionAdviceOutput | null>(null);
@@ -66,6 +76,41 @@ export default function Home() {
   const [isAdvising, setIsAdvising] = useState(false);
   const { toast } = useToast();
   const [analyzedItemName, setAnalyzedItemName] = useState('');
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      // Only fetch profile if firebase is enabled and a user is logged in
+      if (isFirebaseEnabled && user && db) {
+        setProfileLoading(true);
+        try {
+          const docRef = doc(db, 'users', user.uid);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setProfile(docSnap.data() as UserProfile);
+          } else {
+            // Create a profile for a new user
+            const initialProfile: UserProfile = { allergies: [], medications: [], conditions: [] };
+            await setDoc(docRef, initialProfile);
+            setProfile(initialProfile);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          toast({
+            title: "Error",
+            description: "Could not fetch your profile. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setProfileLoading(false);
+        }
+      } else {
+        // If no user or firebase is disabled, use a default empty profile
+        setProfile({ allergies: [], medications: [], conditions: [] });
+        setProfileLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [user, toast]);
 
   const riskDisplayConfig = {
     None: {
@@ -94,30 +139,65 @@ export default function Home() {
     },
   };
 
-  const handleProfileChange = (field: keyof UserProfile) => (items: string[]) => {
-    setProfile((prev) => ({ ...prev, [field]: items }));
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  const handleProfileChange = (field: keyof UserProfile) => async (items: string[]) => {
+    // Can only save profile if firebase is enabled and user is logged in.
+    if (!isFirebaseEnabled || !user || !db) return;
+    
+    const newProfile = { ...profile, [field]: items };
+    setProfile(newProfile);
+    try {
+      const docRef = doc(db, 'users', user.uid);
+      await setDoc(docRef, newProfile, { merge: true });
+    } catch (error) {
+       toast({
+         title: "Update Failed",
+         description: `Could not save your ${field}.`,
+         variant: "destructive",
+       });
     }
   };
 
-  const removeImage = () => {
-    setImagePreview(null);
-    const fileInput = document.getElementById('item-photo') as HTMLInputElement;
-    if(fileInput) fileInput.value = '';
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      if (imagePreviews.length + files.length > 5) {
+        toast({ title: "Upload limit reached", description: "You can upload a maximum of 5 photos.", variant: "destructive" });
+        return;
+      }
+      const fileReaders: FileReader[] = [];
+      const newPreviews: string[] = [];
+      
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        fileReaders.push(reader);
+        reader.onloadend = () => {
+          newPreviews.push(reader.result as string);
+          if (newPreviews.length === files.length) {
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+     const fileInput = document.getElementById('item-photo') as HTMLInputElement;
+     if(fileInput) fileInput.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleCheckCompatibility = async () => {
+    if (!isFirebaseEnabled && !user) {
+       toast({ title: "Please configure Firebase", description: "Login is disabled until Firebase is configured in your environment.", variant: "destructive" });
+       return;
+    }
+     if (!user) {
+       toast({ title: "Please log in", description: "You need to be logged in to check compatibility.", variant: "destructive" });
+       return;
+    }
     const currentItemName = itemName.trim();
-    if (!currentItemName && !imagePreview) {
+    if (!currentItemName && imagePreviews.length === 0) {
       toast({
         title: 'Item details required',
         description: 'Please enter an item name or upload a photo to check.',
@@ -134,7 +214,7 @@ export default function Home() {
     const input: CheckItemCompatibilityInput = {
       userProfile: profile,
       itemName: currentItemName,
-      photoDataUri: imagePreview || undefined,
+      photoDataUris: imagePreviews.length > 0 ? imagePreviews : undefined,
     };
 
     try {
@@ -160,6 +240,12 @@ export default function Home() {
       setIsLoading(false);
     }
   };
+  
+  const handleLogout = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    toast({ title: 'Logged out successfully.' });
+  }
 
   const handleSuggestAlternatives = async () => {
     if (!analyzedItemName) return;
@@ -212,10 +298,19 @@ export default function Home() {
   };
 
   const showActionButtons = result && result.riskLevel && (result.riskLevel === 'Moderate' || result.riskLevel === 'High');
+  const isAppDisabled = profileLoading;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted to-background text-foreground">
-      <header className="absolute top-4 right-4 z-50">
+       <header className="absolute top-4 right-4 z-50 flex items-center gap-4">
+        {user ? (
+            <div className="flex items-center gap-4">
+                <span className="text-sm font-medium flex items-center gap-2"><UserIcon className="h-4 w-4" /> {user.email}</span>
+                <Button variant="outline" size="icon" onClick={handleLogout}><LogOut className="h-4 w-4" /></Button>
+            </div>
+        ) : (
+            <AuthDialog />
+        )}
         <ThemeToggle />
       </header>
       <main className="p-4 py-8 md:p-8 md:py-12 lg:p-12 lg:py-16">
@@ -239,44 +334,64 @@ export default function Home() {
             </Alert>
           </section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+          <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12", isAppDisabled && "opacity-50 pointer-events-none")}>
             
             <section id="profile" aria-labelledby="profile-heading" className="space-y-6">
               <div>
                 <h2 id="profile-heading" className="text-3xl font-bold tracking-tight">Your Health Profile</h2>
                 <p className="text-muted-foreground mt-2">
-                  Add your current health details for an accurate compatibility analysis. This information is processed in your browser and is not stored.
+                  {user ? 'Add your health details for an accurate analysis. Your data is saved to your account.' : 'Log in to manage your health profile.'}
                 </p>
+                {!isFirebaseEnabled && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Firebase Not Configured</AlertTitle>
+                    <AlertDescription>
+                      User login and profile storage are disabled. To enable them, add your Firebase project credentials to your environment variables.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
-              <div className="space-y-4">
-                <TagList
-                  id="allergies-input"
-                  title="Allergies"
-                  Icon={Ban}
-                  items={profile.allergies}
-                  setItems={handleProfileChange('allergies')}
-                  placeholder="e.g., Penicillin"
-                  category="allergies"
-                />
-                <TagList
-                  id="medications-input"
-                  title="Current Medications"
-                  Icon={Pill}
-                  items={profile.medications}
-                  setItems={handleProfileChange('medications')}
-                  placeholder="e.g., Metformin 500mg"
-                  category="medications"
-                />
-                <TagList
-                  id="conditions-input"
-                  title="Medical Conditions"
-                  Icon={Stethoscope}
-                  items={profile.conditions}
-                  setItems={handleProfileChange('conditions')}
-                  placeholder="e.g., Type 2 Diabetes"
-                  category="conditions"
-                />
-              </div>
+              {profileLoading ? (
+                 <div className="space-y-4">
+                  <Skeleton className="h-48 w-full" />
+                  <Skeleton className="h-48 w-full" />
+                  <Skeleton className="h-48 w-full" />
+                 </div>
+              ): (
+                <div className="space-y-4">
+                  <TagList
+                    id="allergies-input"
+                    title="Allergies"
+                    Icon={Ban}
+                    items={profile.allergies}
+                    setItems={handleProfileChange('allergies')}
+                    placeholder="e.g., Penicillin"
+                    category="allergies"
+                    disabled={isAppDisabled || !user}
+                  />
+                  <TagList
+                    id="medications-input"
+                    title="Current Medications"
+                    Icon={Pill}
+                    items={profile.medications}
+                    setItems={handleProfileChange('medications')}
+                    placeholder="e.g., Metformin 500mg"
+                    category="medications"
+                    disabled={isAppDisabled || !user}
+                  />
+                  <TagList
+                    id="conditions-input"
+                    title="Medical Conditions"
+                    Icon={Stethoscope}
+                    items={profile.conditions}
+                    setItems={handleProfileChange('conditions')}
+                    placeholder="e.g., Type 2 Diabetes"
+                    category="conditions"
+                    disabled={isAppDisabled || !user}
+                  />
+                </div>
+              )}
             </section>
 
             <aside id="checker" aria-labelledby="checker-heading" className="lg:sticky top-8 self-start">
@@ -288,25 +403,23 @@ export default function Home() {
                 <CardContent>
                   <div className="space-y-6">
                      <div className="space-y-2">
-                      <Label htmlFor="item-photo" className="font-semibold">Item Photo (Optional)</Label>
+                      <Label htmlFor="item-photo" className="font-semibold">Item Photo(s) (Optional, up to 5)</Label>
                       <div className="flex items-start gap-4">
-                        {imagePreview ? (
-                          <div className="relative flex-shrink-0">
-                            <Image src={imagePreview} alt="Item preview" width={112} height={112} className="h-28 w-28 object-cover rounded-lg border-2 border-border" data-ai-hint="medication product" />
-                            <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-7 w-7 rounded-full shadow-md" onClick={removeImage}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <label htmlFor="item-photo" className="flex-shrink-0 flex flex-col items-center justify-center h-28 w-28 rounded-lg border-2 border-dashed border-muted-foreground/50 cursor-pointer hover:bg-accent/10 transition-colors">
-                            <Upload className="h-8 w-8 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground mt-1">Upload Photo</span>
-                          </label>
-                        )}
-                        <Input id="item-photo" type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
-                        <p className="text-sm text-muted-foreground pt-2">
-                          For best results, upload a clear photo of the item, such as the product packaging or the pill itself.
-                        </p>
+                        <label htmlFor="item-photo" className="flex-shrink-0 flex flex-col items-center justify-center h-28 w-28 rounded-lg border-2 border-dashed border-muted-foreground/50 cursor-pointer hover:bg-accent/10 transition-colors">
+                          <Upload className="h-8 w-8 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground mt-1 text-center">Upload Photo(s)</span>
+                        </label>
+                        <Input id="item-photo" type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" disabled={!user} />
+                         <div className="flex flex-wrap gap-2 flex-1">
+                          {imagePreviews.map((preview, index) => (
+                             <div key={index} className="relative flex-shrink-0">
+                              <Image src={preview} alt={`Item preview ${index + 1}`} width={80} height={80} className="h-20 w-20 object-cover rounded-lg border-2 border-border" data-ai-hint="medication product" />
+                              <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-6 w-6 rounded-full shadow-md" onClick={() => removeImage(index)}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -320,10 +433,11 @@ export default function Home() {
                         placeholder="e.g., Tylenol 500mg, Coffee"
                         className="flex-grow text-base"
                         aria-label="Item to check"
+                        disabled={!user}
                       />
                     </div>
                     
-                    <Button onClick={handleCheckCompatibility} disabled={isLoading} className="w-full text-base py-6 font-bold">
+                    <Button onClick={handleCheckCompatibility} disabled={isLoading || !user} className="w-full text-base py-6 font-bold">
                       {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <HeartPulse className="mr-2 h-5 w-5" /> }
                       {isLoading ? 'Checking...' : 'Check Compatibility'}
                     </Button>
@@ -345,6 +459,7 @@ export default function Home() {
 
                     {result && result.riskLevel && (() => {
                       const riskConfig = riskDisplayConfig[result.riskLevel!];
+                      const title = analyzedItemName || (imagePreviews.length > 0 ? "the uploaded item" : "the item");
                       return (
                         <Card className={cn("animate-in fade-in-50 duration-500", riskConfig.cardClass)}>
                           <CardHeader>
@@ -352,7 +467,7 @@ export default function Home() {
                               <riskConfig.Icon className="h-6 w-6" /> {riskConfig.label}
                             </CardTitle>
                             <CardDescription>
-                              Analysis for "{analyzedItemName || 'the uploaded item'}"
+                              Analysis for "{title}"
                             </CardDescription>
                           </CardHeader>
                           <CardContent>
@@ -427,7 +542,9 @@ export default function Home() {
 
                     {!isLoading && !result && (
                        <div className="flex items-center justify-center text-center h-[200px] py-10 px-4 border-2 border-dashed rounded-lg">
-                         <p className="text-muted-foreground">Your compatibility report will appear here.</p>
+                         <p className="text-muted-foreground">
+                          {user ? 'Your compatibility report will appear here.' : 'Please log in to start a compatibility check.'}
+                         </p>
                        </div>
                     )}
                   </div>

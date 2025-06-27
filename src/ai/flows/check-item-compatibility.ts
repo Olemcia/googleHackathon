@@ -20,11 +20,11 @@ const CheckItemCompatibilityInputSchema = z.object({
     })
     .describe("The user's health profile."),
   itemName: z.string().describe('The name of the drug or food item to check for compatibility.'),
-  photoDataUri: z
-    .string()
+  photoDataUris: z
+    .array(z.string())
     .optional()
     .describe(
-      "An optional photo of the item, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "Optional photos of the item, as data URIs that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
 
@@ -54,8 +54,11 @@ const checkItemCompatibilityPrompt = ai.definePrompt({
 
 **Item to Evaluate:**
 - Name: {{{itemName}}}
-{{#if photoDataUri}}
-- Photo: {{media url=photoDataUri}}
+{{#if photoDataUris}}
+- Photos:
+{{#each photoDataUris}}
+- {{media url=this}}
+{{/each}}
 {{/if}}
 
 **User Health Profile:**
@@ -64,11 +67,11 @@ const checkItemCompatibilityPrompt = ai.definePrompt({
 - Pre-existing Medical Conditions: {{{userProfile.conditions}}}
 
 **Task:**
-1.  **First, validate the item.** Determine if "{{itemName}}" and/or the provided photo represent a plausible drug, supplement, or food item. If it is nonsensical (e.g., "asdfgh"), irrelevant (e.g., "a car"), or clearly not a consumable item, set 'isValidItem' to false and stop. Do not generate an analysis or risk level.
+1.  **First, validate the item.** Determine if "{{itemName}}" and/or the provided photos represent a plausible drug, supplement, or food item. If it is nonsensical (e.g., "asdfgh"), irrelevant (e.g., "a car"), or clearly not a consumable item, set 'isValidItem' to false and stop. Do not generate an analysis or risk level.
 2.  If the item is valid, set 'isValidItem' to true and proceed.
 3.  Act as a cautious medical information AI.
 4.  Analyze potential interactions, contraindications, and risks for the user based on their specific health profile and the validated item.
-5.  If a photo is provided, use it as the primary source for identifying the item. If the "Name" field seems to contradict the photo, prioritize the visual information from the photo.
+5.  If photos are provided, use them as the primary source for identifying the item. If the "Name" field seems to contradict the photos, prioritize the visual information from the photos.
 6.  Based on your analysis, determine a risk level and set the 'riskLevel' field to one of the following: "None", "Low", "Moderate", or "High".
 7.  Provide a clear, easy-to-understand explanation in the 'analysis' field. Start with a direct safety conclusion (e.g., "High Risk Identified," "Appears Safe," "Use with Caution") and then explain the reasoning in detail.
 8.  Do not provide medical advice, but explain the known biological and chemical interactions.

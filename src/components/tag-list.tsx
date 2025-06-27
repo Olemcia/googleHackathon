@@ -26,9 +26,10 @@ interface TagListProps {
   placeholder: string;
   id: string;
   category: 'allergies' | 'medications' | 'conditions';
+  disabled?: boolean;
 }
 
-export function TagList({ title, Icon, items, setItems, placeholder, id, category }: TagListProps) {
+export function TagList({ title, Icon, items, setItems, placeholder, id, category, disabled = false }: TagListProps) {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -138,8 +139,10 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
   const debouncedFetchSuggestions = useCallback(debounce(fetchSuggestions, 300), [category, items]);
 
   useEffect(() => {
-    debouncedFetchSuggestions(inputValue);
-  }, [inputValue, debouncedFetchSuggestions]);
+    if (!disabled) {
+      debouncedFetchSuggestions(inputValue);
+    }
+  }, [inputValue, debouncedFetchSuggestions, disabled]);
 
 
   return (
@@ -151,7 +154,7 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Popover open={popoverOpen && suggestions.length > 0} onOpenChange={setPopoverOpen}>
+        <Popover open={!disabled && popoverOpen && suggestions.length > 0} onOpenChange={setPopoverOpen}>
           <PopoverAnchor asChild>
             <div className="flex gap-2 mb-4 relative">
               <Input
@@ -164,8 +167,9 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
                 aria-label={`Add new ${title}`}
                 className="text-base"
                 autoComplete="off"
+                disabled={disabled}
               />
-              <Button type="button" onClick={() => handleAddItem(inputValue)} size="icon" aria-label={`Add ${inputValue}`} disabled={isAdding}>
+              <Button type="button" onClick={() => handleAddItem(inputValue)} size="icon" aria-label={`Add ${inputValue}`} disabled={isAdding || disabled}>
                 {isAdding ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
               </Button>
             </div>
@@ -200,6 +204,7 @@ export function TagList({ title, Icon, items, setItems, placeholder, id, categor
                   onClick={() => handleRemoveItem(item)}
                   className="ml-2 rounded-full hover:bg-black/10 p-0.5 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
                   aria-label={`Remove ${item}`}
+                  disabled={disabled}
                 >
                   <X className="h-4 w-4" />
                 </button>
