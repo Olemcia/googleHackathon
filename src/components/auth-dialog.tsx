@@ -17,10 +17,26 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail, Lock } from 'lucide-react';
+
+const getFriendlyErrorMessage = (errorCode: string) => {
+    switch (errorCode) {
+        case 'auth/invalid-credential':
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+            return 'Invalid email or password. Please check your credentials and try again.';
+        case 'auth/email-already-in-use':
+            return 'An account with this email address already exists. Please log in or use a different email.';
+        case 'auth/weak-password':
+            return 'Your password is too weak. It should be at least 6 characters long.';
+        case 'auth/invalid-email':
+            return 'The email address is not valid. Please enter a valid email.';
+        default:
+            return 'An unexpected error occurred. Please try again.';
+    }
+}
 
 export function AuthDialog() {
   const [open, setOpen] = useState(false);
@@ -39,7 +55,7 @@ export function AuthDialog() {
       setOpen(false);
       toast({ title: 'Logged in successfully!' });
     } catch (err: any) {
-      setError(err.message.replace('Firebase: ', ''));
+      setError(getFriendlyErrorMessage(err.code || err.message));
     } finally {
       setLoading(false);
     }
@@ -54,7 +70,7 @@ export function AuthDialog() {
       setOpen(false);
       toast({ title: 'Registered successfully!' });
     } catch (err: any) {
-      setError(err.message.replace('Firebase: ', ''));
+      setError(getFriendlyErrorMessage(err.code || err.message));
     } finally {
       setLoading(false);
     }
@@ -66,12 +82,19 @@ export function AuthDialog() {
     setPassword('');
   }
 
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>, action: 'login' | 'register') => {
+    if (e.key === 'Enter') {
+        if (action === 'login') handleLogin();
+        else handleRegister();
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>Login / Register</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         {!isFirebaseConfigured ? (
              <DialogHeader>
                 <DialogTitle>Authentication Unavailable</DialogTitle>
@@ -86,49 +109,49 @@ export function AuthDialog() {
                 <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
-                <DialogHeader className="pt-2">
-                <DialogTitle>Login</DialogTitle>
-                <DialogDescription>Access your saved health profile.</DialogDescription>
+                <DialogHeader className="pt-4 text-center">
+                    <DialogTitle className="text-2xl">Welcome Back</DialogTitle>
+                    <DialogDescription>Sign in to access your profile.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="login-email" className="text-right">Email</Label>
-                    <Input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="login-password" className="text-right">Password</Label>
-                    <Input id="login-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="col-span-3" />
-                </div>
+                <div className="space-y-4 py-6">
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input id="login-email" type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => handleKeyPress(e, 'login')} className="pl-10" />
+                    </div>
+                    <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input id="login-password" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => handleKeyPress(e, 'login')} className="pl-10" />
+                    </div>
                 </div>
                 {error && <p className="text-sm text-destructive text-center pb-4">{error}</p>}
                 <DialogFooter>
-                <Button onClick={handleLogin} className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Login
-                </Button>
+                    <Button onClick={handleLogin} className="w-full" disabled={loading}>
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Login
+                    </Button>
                 </DialogFooter>
             </TabsContent>
             <TabsContent value="register">
-                <DialogHeader className="pt-2">
-                <DialogTitle>Register</DialogTitle>
-                <DialogDescription>Create an account to save your profile.</DialogDescription>
+                <DialogHeader className="pt-4 text-center">
+                    <DialogTitle className="text-2xl">Create an Account</DialogTitle>
+                    <DialogDescription>It's quick and easy to get started.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="register-email" className="text-right">Email</Label>
-                    <Input id="register-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="register-password" className="text-right">Password</Label>
-                    <Input id="register-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="col-span-3" />
-                </div>
+                 <div className="space-y-4 py-6">
+                    <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input id="register-email" type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => handleKeyPress(e, 'register')} className="pl-10" />
+                    </div>
+                    <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input id="register-password" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => handleKeyPress(e, 'register')} className="pl-10" />
+                    </div>
                 </div>
                 {error && <p className="text-sm text-destructive text-center pb-4">{error}</p>}
                 <DialogFooter>
-                <Button onClick={handleRegister} className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Register
-                </Button>
+                    <Button onClick={handleRegister} className="w-full" disabled={loading}>
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Create Account
+                    </Button>
                 </DialogFooter>
             </TabsContent>
             </Tabs>
