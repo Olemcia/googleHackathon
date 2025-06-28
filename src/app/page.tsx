@@ -285,7 +285,7 @@ export default function Home() {
                 <HeartPulse className="h-10 w-10 text-primary" />
               </div>
               <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter">
-                Health Harmony AI
+                MediMatch
               </h1>
               <p className="max-w-2xl mx-auto mt-4 text-lg text-muted-foreground">
                 Instantly check if a new food or drug is compatible with your personal health profile.
